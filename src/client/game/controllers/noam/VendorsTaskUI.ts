@@ -217,11 +217,6 @@ export default class VendorsTaskUI {
       }
     }
 
-    if (!anyAccepted) {
-      // כאן אפשר בעתיד להחזיר גם reason/UI feedback,
-      // אבל כרגע זה רק “לא נקלט” בלי לתקוע.
-    }
-
     this.renderList(needCount);
   }
 

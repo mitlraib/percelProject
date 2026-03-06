@@ -64,10 +64,17 @@ export class MyRoom extends Room {
       this.broadcast("turn", { currentTurn: this.currentTurn } satisfies TurnPayload);
     });
 
-    // (אופציונלי) אם את עדיין צריכה keydown messages:
-    // this.onMessage("keydown", (client: Client, message: any) => {
-    //   this.broadcast("keydown", { from: client.sessionId, ...message }, { except: client });
-    // });
+    // penalty (משימת נועם – כישלון: 3 צעדים אחורה)
+    this.onMessage("penalty", (client: Client, msg: any) => {
+      const idx = this.players.indexOf(client.sessionId);
+      if (idx === -1) return;
+
+      const raw = Number(msg?.deltaSteps);
+      if (!Number.isFinite(raw)) return;
+
+      const deltaSteps = Math.max(-10, Math.min(-1, Math.floor(raw)));
+      this.broadcast("penaltyMove", { playerIndex: idx, deltaSteps });
+    });
   }
 
   onJoin(client: Client) {

@@ -118,6 +118,5 @@ export default class SoloVsBotMatch extends Phaser.Events.EventEmitter {
   private onDiceRolled(value: number) {
     const p = this.currentPlayer;
     this.emit("dice-rolled", { player: p, value });
-    // לא מעבירים תור כאן
   }
 }

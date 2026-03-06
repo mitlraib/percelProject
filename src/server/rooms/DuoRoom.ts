@@ -13,32 +13,27 @@ export class DuoRoom extends Room {
   private ready = false;
 
   onCreate() {
-    // sync ← מחזיר הכל כדי שלא נפספס
     this.onMessage("sync", (client: Client) => {
       this.sendAllStateTo(client);
     });
 
-    // roll ← רק אם זה התור של השולח ורק אם ready
+    // penalty (משימת נועם – כישלון: 3 צעדים אחורה) – רשום פעם אחת, לא בתוך roll
+    this.onMessage("penalty", (client: Client, msg: any) => {
+      const idx = this.players.indexOf(client.sessionId);
+      if (idx === -1) return;
+
+      const raw = Number(msg?.deltaSteps);
+      if (!Number.isFinite(raw)) return;
+
+      const deltaSteps = Math.max(-10, Math.min(-1, Math.floor(raw)));
+      this.broadcast("penaltyMove", { playerIndex: idx, deltaSteps });
+    });
+
     this.onMessage("roll", (client: Client, msg: any) => {
       if (!this.ready) {
         client.send("rollDenied", { reason: "not_ready" });
         return;
       }
-      // בתוך DuoRoom.onCreate()
-
-this.onMessage("penalty", (client: Client, msg: any) => {
-  const idx = this.players.indexOf(client.sessionId);
-  if (idx === -1) return;
-
-  const raw = Number(msg?.deltaSteps);
-  if (!Number.isFinite(raw)) return;
-
-  // מאפשרים רק שלילי ובגבול סביר (לדוגמה: עד 10 צעדים אחורה)
-  const deltaSteps = Math.max(-10, Math.min(-1, Math.floor(raw)));
-
-  // משדרים לכולם תזוזת penalty (ללא שינוי תור)
-  this.broadcast("penaltyMove", { playerIndex: idx, deltaSteps });
-});
 
       const idx = this.players.indexOf(client.sessionId);
       if (idx === -1) return;
@@ -56,11 +51,9 @@ this.onMessage("penalty", (client: Client, msg: any) => {
 
       const value = Math.max(1, Math.min(6, Math.floor(raw)));
 
-      // משדרים תזוזה לכולם
       const move: MovePayload = { playerIndex: idx, value };
       this.broadcast("move", move);
 
-      // מעבירים תור
       this.currentTurn = this.currentTurn === 0 ? 1 : 0;
       this.broadcast("turn", { currentTurn: this.currentTurn } satisfies TurnPayload);
     });
