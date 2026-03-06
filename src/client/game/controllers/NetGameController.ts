@@ -15,6 +15,7 @@ type AssignPayload = { playerIndex: number };
 type TurnPayload = { currentTurn: number };
 type MovePayload = { playerIndex: number; value: number };
 type PenaltyMovePayload = { playerIndex: number; deltaSteps: number };
+type RollDeniedPayload = { reason?: string; currentTurn?: number };
 
 export default class NetGameController extends Phaser.Events.EventEmitter {
   private room: Room;
@@ -33,7 +34,6 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
     this.room = room;
     this.playerCount = playerCount;
 
-    // --- listeners ---
     room.onMessage("players", (p: PlayersPayload) => {
       this.playersCount = p.count;
       this.recomputeCanRoll();
@@ -62,12 +62,20 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
       this.emit("move", p);
     });
 
-    // ✅ הכי חשוב: penaltyMove
     room.onMessage("penaltyMove", (p: PenaltyMovePayload) => {
       this.emit("penaltyMove", p);
     });
 
-    // sync
+    room.onMessage("rollDenied", (p: RollDeniedPayload) => {
+      if (Number.isFinite(p.currentTurn)) {
+        this.currentTurn = p.currentTurn as number;
+        this.recomputeCanRoll();
+        this.emitState();
+      }
+      this.room.send("sync");
+      this.emit("rollDenied", p);
+    });
+
     this.room.send("sync");
   }
 
@@ -83,9 +91,10 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
     this.room.send("roll", { value });
   }
 
-  // ✅ משימת נועם: שליחה לשרת
+  // ✅ Noam penalty
+  // optional: include myIndex to help server debugging (server can ignore)
   sendPenalty(deltaSteps: number) {
-    this.room.send("penalty", { deltaSteps });
+    this.room.send("penalty", { deltaSteps, playerIndex: this.myIndex });
   }
 
   private recomputeCanRoll() {

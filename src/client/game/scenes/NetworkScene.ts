@@ -4,6 +4,8 @@ import Phaser from "phaser";
 import * as Colyseus from "@colyseus/sdk";
 import type { Room } from "@colyseus/sdk";
 
+import NetGameController from "../controllers/NetGameController";
+
 type Mode = "solo" | "local";
 
 export default class NetworkScene extends Phaser.Scene {
@@ -33,6 +35,7 @@ export default class NetworkScene extends Phaser.Scene {
     // SOLO: מדלגים ישר למשחק
     if (this.mode === "solo") {
       this.registry.remove("room");
+      this.registry.remove("net");
       this.scene.start("parallax-scene", { mode: this.mode, playerCount: this.playerCount });
       return;
     }
@@ -52,8 +55,10 @@ export default class NetworkScene extends Phaser.Scene {
       return;
     }
 
-    // מעבירים את ה-room לסצנה הבאה דרך registry + event
+    // חשוב: רושמים onMessage על ה-room מיד אחרי ההצטרפות, לפני שהשרת שולח assign/ready/turn (כך הקובייה והתור יעבדו)
+    const net = new NetGameController(this.room, this.playerCount);
     this.registry.set("room", this.room);
+    this.registry.set("net", net);
     this.game.events.emit("room-ready");
 
     this.scene.start("parallax-scene", { mode: this.mode, playerCount: this.playerCount });

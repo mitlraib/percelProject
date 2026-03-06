@@ -38,7 +38,9 @@ export default class ParallaxScene extends Phaser.Scene {
   private noamTasks!: NoamTaskManager;
 
   private currentTurnName = "";
-  private myPlayerIndex = 0;
+
+  // ✅ קריטי: עד שלא הגיע assign מהשרת — אין שחקן מקומי
+  private myPlayerIndex: number | null = null;
 
   private laneStartX = 90;
   private stepSizePx = 90;
@@ -46,8 +48,9 @@ export default class ParallaxScene extends Phaser.Scene {
 
   private readonly MOVE_MS = 2000;
 
-  // penalty callbacks waiting (for online)
-  private pendingPenaltyDone = new Map<number, () => void>();
+  // רצף קבוע לשחקנית 0 (הילדה) לצורך בדיקות
+  private readonly fixedDiceSeqPlayer0 = [5, 2, 3, 6, 5, 6];
+  private fixedDiceSeqIndex0 = 0;
 
   constructor() {
     super("parallax-scene");
@@ -70,8 +73,6 @@ export default class ParallaxScene extends Phaser.Scene {
     this.load.image("דוב", new URL("../../assets/דוב.png", import.meta.url).toString());
 
     this.load.image("MOM", new URL("../../assets/MOM.png", import.meta.url).toString());
-
-    // ✅ NOAM asset
     this.load.image("NOAM", new URL("../../assets/NOAM.png", import.meta.url).toString());
   }
 
@@ -111,11 +112,17 @@ export default class ParallaxScene extends Phaser.Scene {
     // Mom + tasks
     this.momCtl = new MomController(this);
 
+    // ✅ isLocalPlayerIndex חייב להיות חסין ל-null
+    const isLocalIdx = (idx: number) => {
+      const me = this.getMyIndex();
+      return me !== null && idx === me;
+    };
+
     this.tasks = new TaskManager(this, this.momCtl, {
       taskSteps: [3, 10],
 
       isBotPlayerIndex: (idx) => this.mode === "solo" && idx === 1,
-      isLocalPlayerIndex: (idx) => idx === this.getMyIndex(),
+      isLocalPlayerIndex: isLocalIdx,
 
       getStepWorldXY: (step) => ({
         x: this.laneStartX + (step - 1) * this.stepSizePx,
@@ -126,12 +133,11 @@ export default class ParallaxScene extends Phaser.Scene {
       unlock: () => this.unlockAfterTask(),
     });
 
-    // ✅ Noam tasks (27,30)
     this.noamTasks = new NoamTaskManager(this, {
       steps: [27, 30],
 
       isBotPlayerIndex: (idx) => this.mode === "solo" && idx === 1,
-      isLocalPlayerIndex: (idx) => idx === this.getMyIndex(),
+      isLocalPlayerIndex: isLocalIdx,
 
       getStepWorldXY: (step) => ({
         x: this.laneStartX + (step - 1) * this.stepSizePx,
@@ -142,15 +148,14 @@ export default class ParallaxScene extends Phaser.Scene {
       unlock: () => this.unlockAfterTask(),
 
       onFailPenalty: (playerIndex, deltaSteps, done) => {
-        // ONLINE → שרת משדר penaltyMove לכולם
-        if (this.net) {
-          this.pendingPenaltyDone.set(playerIndex, done);
-          this.net.sendPenalty(deltaSteps);
+        if (!this.net) {
+          this.playPenaltyMove(playerIndex, deltaSteps, done);
           return;
         }
 
-        // OFFLINE → מזיזים מיד מקומית
-        this.playPenaltyMove(playerIndex, deltaSteps, done);
+        // Network: continue turn immediately so next player gets the dice; penalty animation runs when penaltyMove arrives
+        this.net.sendPenalty(deltaSteps);
+        done();
       },
     });
 
@@ -163,7 +168,13 @@ export default class ParallaxScene extends Phaser.Scene {
       if (this.tasks.isLocked()) return;
       if (this.noamTasks.isLocked()) return;
       if (this.ui.isDiceDisabled()) return;
-      if (this.net && !this.net.canRollNow()) return;
+
+      if (this.net) {
+        // ✅ אם עדיין אין assign, לא לגלגל
+        if (this.getMyIndex() === null) return;
+        if (!this.net.canRollNow()) return;
+      }
+
       this.ui.dice.tryRollFromInput();
     });
 
@@ -174,16 +185,25 @@ export default class ParallaxScene extends Phaser.Scene {
       // SOLO מנוהל ע"י match
       if (this.mode === "solo") return;
 
-      // Network
+      // רצף קבוע לשחקן 0 בלבד (עד 6 גלגולים ראשונים)
+      let finalValue = value;
+      const meIdx = this.getMyIndex();
+      if (meIdx === 0 && this.fixedDiceSeqIndex0 < this.fixedDiceSeqPlayer0.length) {
+        finalValue = this.fixedDiceSeqPlayer0[this.fixedDiceSeqIndex0++];
+      }
+
+      // Network: שולחים לשרת ומחכים ל-"move" חזרה ממנו
       if (this.net) {
+        if (this.getMyIndex() === null) return; // ✅ אין assign
         if (!this.net.canRollNow()) return;
+
         this.ui.setDiceVisibleDeferred(true);
-        this.net.sendRoll(value);
+        this.net.sendRoll(finalValue);
         return;
       }
 
       // fallback local single
-      this.playMoveTurn(0, value);
+      this.playMoveTurn(0, finalValue);
     });
 
     this.refreshHUD();
@@ -204,20 +224,22 @@ export default class ParallaxScene extends Phaser.Scene {
     }
 
     const room = this.registry.get("room") as Room | undefined;
+    const existingNet = this.registry.get("net") as NetGameController | undefined;
     if (!room) {
       this.game.events.once("room-ready", () => {
         const r = this.registry.get("room") as Room | undefined;
-        if (r) this.attachNet(r);
+        const net = this.registry.get("net") as NetGameController | undefined;
+        if (r) this.attachNet(r, net);
       });
       return;
     }
 
-    this.attachNet(room);
+    this.attachNet(room, existingNet);
   }
 
-  private attachNet(room: Room) {
+  private attachNet(room: Room, existingNet?: NetGameController) {
     this.room = room;
-    this.net = new NetGameController(room, this.playerCount);
+    this.net = existingNet ?? new NetGameController(room, this.playerCount);
 
     this.net.on("state", (s: NetStateView) => {
       if (!s.ready) {
@@ -229,16 +251,26 @@ export default class ParallaxScene extends Phaser.Scene {
         return;
       }
 
-      if (s.myIndex !== null && s.myIndex !== undefined) this.myPlayerIndex = s.myIndex;
+      // ✅ מקבלים assign מהשרת
+      if (s.myIndex !== null && s.myIndex !== undefined) {
+        this.myPlayerIndex = s.myIndex;
+      }
 
       const names = this.getCharNames();
       const emojis = ["👧", "🐶", "🐻", "🎮"];
 
-      const myName = names[this.myPlayerIndex] ?? "שחקן";
-      const myEmoji = emojis[this.myPlayerIndex] ?? "🎮";
+      const me = this.getMyIndex();
+      const myIdxForUI = me ?? 0; // רק לתצוגה עד assign
+
+      const myName = names[myIdxForUI] ?? "שחקן";
+      const myEmoji = emojis[myIdxForUI] ?? "🎮";
       this.ui.setDicePlayer(myName, myEmoji);
 
-      if (!this.tasks.isLocked() && !this.noamTasks.isLocked()) {
+      // ✅ אם אין assign עדיין, לא מאפשרים גלגול
+      if (me === null) {
+        this.ui.setDiceDisabled(true);
+        this.ui.setDiceVisibleDeferred(false);
+      } else if (!this.tasks.isLocked() && !this.noamTasks.isLocked()) {
         this.ui.setDiceDisabled(!s.canRollNow);
         this.ui.setDiceVisibleDeferred(s.canRollNow);
       }
@@ -246,22 +278,18 @@ export default class ParallaxScene extends Phaser.Scene {
       this.currentTurnName = names[s.currentTurn] ?? "";
       this.refreshHUD();
 
-      this.camCtl.follow(this.players.getContainer(this.myPlayerIndex));
+      // follow רק אם יש assign
+      if (me !== null) {
+        this.camCtl.follow(this.players.getContainer(me));
+      }
     });
 
     this.net.on("move", ({ playerIndex, value }: { playerIndex: number; value: number }) => {
       this.playMoveTurn(playerIndex, value);
     });
 
-    // ✅ penaltyMove from server
     this.net.on("penaltyMove", ({ playerIndex, deltaSteps }: { playerIndex: number; deltaSteps: number }) => {
-      this.playPenaltyMove(playerIndex, deltaSteps, () => {
-        const cb = this.pendingPenaltyDone.get(playerIndex);
-        if (cb) {
-          this.pendingPenaltyDone.delete(playerIndex);
-          cb();
-        }
-      });
+      this.playPenaltyMove(playerIndex, deltaSteps);
     });
   }
 
@@ -280,8 +308,6 @@ export default class ParallaxScene extends Phaser.Scene {
 
     this.soloMatch.on("dice-rolled", (e: { player: { name: string }; value: number }) => {
       const idx = e.player.name === "מיטול" ? 0 : 1;
-
-      // אחרי תזוזה+משימות: advanceTurn
       this.playMoveTurn(idx, e.value, () => this.soloMatch?.advanceTurn());
     });
 
@@ -307,7 +333,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
         const stepsNow = this.players.getSteps(playerIndex);
 
-        // קודם אמא (3/10), ואז נועם (27/30)
+        // שרשרת משימות: אמא → נועם
         this.tasks.handleAfterMove(playerIndex, stepsNow, () => {
           this.noamTasks.handleAfterMove(playerIndex, stepsNow, () => {
             const followIdx = this.getMyIndex() ?? 0;
@@ -316,7 +342,6 @@ export default class ParallaxScene extends Phaser.Scene {
             this.time.delayedCall(100, () => this.camCtl.follow(this.players.getContainer(followIdx)));
 
             this.ui.flushPendingDiceVisibility();
-
             onTurnFinished?.();
           });
         });
@@ -329,7 +354,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
     this.players.moveByDice({
       playerIndex,
-      diceValue: deltaSteps, // שלילי (-5)
+      diceValue: deltaSteps,
       laneStartX: this.laneStartX,
       stepSizePx: this.stepSizePx,
       maxX: this.camCtl.getMaxXPadding(40),
@@ -367,6 +392,14 @@ export default class ParallaxScene extends Phaser.Scene {
     }
 
     if (this.net) {
+      const me = this.getMyIndex();
+      if (me === null) {
+        this.ui.setDiceDisabled(true);
+        this.ui.setDiceVisibleDeferred(false);
+        this.refreshHUD();
+        return;
+      }
+
       const can = this.net.canRollNow();
       this.ui.setDiceDisabled(!can);
       this.ui.setDiceVisibleDeferred(can);
@@ -381,18 +414,22 @@ export default class ParallaxScene extends Phaser.Scene {
 
   // ---------------- identity / hud ----------------
 
-  private getMyIndex(): number {
+  private getMyIndex(): number | null {
     if (this.mode === "solo") return 0;
-    return this.myPlayerIndex ?? 0;
+    return this.myPlayerIndex;
   }
 
   private refreshHUD() {
     const names = this.getCharNames();
-    const myName = names[this.myPlayerIndex] ?? "שחקן";
-    const points = this.players.getSteps(this.myPlayerIndex);
+
+    const me = this.getMyIndex();
+    const myIdx = me ?? 0;
+
+    const myName = names[myIdx] ?? "שחקן";
+    const points = this.players.getSteps(myIdx);
 
     const icons = ["👧", "🐶", "🐻", "🎮"];
-    const icon = icons[this.myPlayerIndex] ?? "🎮";
+    const icon = icons[myIdx] ?? "🎮";
 
     const myLine = `${icon} ${myName}  •  ${points} נק'`;
     const turnLine = this.currentTurnName ? `🎯 תור  ·  ${this.currentTurnName}` : "";

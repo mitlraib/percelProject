@@ -91,27 +91,45 @@ export default class PlayerManager {
     ease?: string;
     onComplete?: () => void;
   }) {
-    const container = this.containers[opts.playerIndex];
-    if (!container) return;
+    const idx = opts.playerIndex;
+    const container = this.containers[idx];
 
-    const prev = this.tweens[opts.playerIndex];
-    if (prev) prev.stop();
+    // ✅ קריטי: אם אין שחקן/קונטיינר, לא נתקעים
+    if (!container) {
+      opts.onComplete?.();
+      return;
+    }
 
-    const current = this.steps[opts.playerIndex] ?? 0;
-    const next = Math.max(0, current + opts.diceValue); // ✅ clamp ל-0
-    this.steps[opts.playerIndex] = next;
-    this.totalTexts[opts.playerIndex].setText(String(next));
+    // stop previous tween cleanly
+    const prev = this.tweens[idx];
+    if (prev) {
+      prev.stop();
+      this.tweens[idx] = null;
+    }
 
-    const targetX = opts.laneStartX + next * opts.stepSizePx;
+    const currentSteps = this.steps[idx] ?? 0;
+    const nextSteps = Math.max(0, currentSteps + opts.diceValue); // clamp ל-0
+    this.steps[idx] = nextSteps;
+
+    const t = this.totalTexts[idx];
+    if (t) t.setText(String(nextSteps));
+
+    const targetX = opts.laneStartX + nextSteps * opts.stepSizePx;
     const clampedX = Math.min(targetX, opts.maxX);
 
-    this.tweens[opts.playerIndex] = this.scene.tweens.add({
+    // ✅ אם כבר באותו X, לא צריך tween (ועדיין חייבים onComplete)
+    if (Math.abs(container.x - clampedX) < 0.5) {
+      opts.onComplete?.();
+      return;
+    }
+
+    this.tweens[idx] = this.scene.tweens.add({
       targets: container,
       x: clampedX,
       duration: opts.duration ?? 450,
       ease: opts.ease ?? "Sine.out",
       onComplete: () => {
-        this.tweens[opts.playerIndex] = null;
+        this.tweens[idx] = null;
         opts.onComplete?.();
       },
     });
