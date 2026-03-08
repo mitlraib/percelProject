@@ -1,4 +1,4 @@
-import server from "app.config.js";
+import server from "./app.config.js";
 const port = Number(process.env.PORT) || 2567;
 
 // defineServer מחזיר אובייקט שיש לו listen בפועל (בגרסאות החדשות)
