@@ -1,7 +1,9 @@
-// src/client/game/controllers/PlayerManager.ts
 import Phaser from "phaser";
 
 export type PlayerTextures = string[];
+
+/** Depth above WorldBuilder plants layer (50) so players draw in front of foreground. */
+const PLAYER_DEPTH = 200;
 
 export default class PlayerManager {
   private scene: Phaser.Scene;
@@ -12,6 +14,12 @@ export default class PlayerManager {
   private steps: number[] = [];
   private tweens: Array<Phaser.Tweens.Tween | null> = [];
 
+  private laneOffsets: number[] = [];
+  private targetHeight = 70;
+  private depth = PLAYER_DEPTH;
+  private laneStartX = 0;
+  private groundY = 0;
+
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
   }
@@ -19,11 +27,13 @@ export default class PlayerManager {
   destroy() {
     for (const t of this.tweens) t?.stop();
     for (const c of this.containers) c.destroy(true);
+
     this.containers = [];
     this.sprites = [];
     this.totalTexts = [];
     this.steps = [];
     this.tweens = [];
+    this.laneOffsets = [];
   }
 
   spawn(opts: {
@@ -36,32 +46,80 @@ export default class PlayerManager {
   }) {
     this.destroy();
 
-    const laneOffsets = opts.laneOffsets ?? [0, 45, 90, 135];
-    const targetH = opts.targetHeight ?? 70;
-    const depth = opts.depth ?? 50;
+    this.groundY = opts.groundY;
+    this.laneStartX = opts.laneStartX;
+    this.laneOffsets = opts.laneOffsets ?? [0, 45, 90, 135];
+    this.targetHeight = opts.targetHeight ?? 70;
+    this.depth = opts.depth ?? PLAYER_DEPTH;
 
     opts.textures.forEach((tex, i) => {
-      const offset = laneOffsets[i] ?? 0;
-      const y = opts.groundY - offset;
+      const offset = this.laneOffsets[i] ?? 0;
+      const y = this.groundY - offset;
 
       const img = this.scene.add.image(0, 0, tex).setOrigin(0.5, 1);
-      img.setScale(targetH / img.height);
+      img.setScale(this.targetHeight / img.height);
+
+      const fontPx = Math.max(14, Math.round(this.targetHeight * 0.22));
 
       const totalText = this.scene.add
-        .text(0, -img.displayHeight - 8, "0", {
+        .text(0, -img.displayHeight - Math.max(8, this.targetHeight * 0.08), "0", {
           fontFamily: "Arial",
-          fontSize: "14px",
+          fontSize: `${fontPx}px`,
           color: "#000000",
         })
         .setOrigin(0.5, 0.5);
 
-      const container = this.scene.add.container(opts.laneStartX, y, [img, totalText]).setDepth(depth);
+      const container = this.scene.add
+        .container(this.laneStartX, y, [img, totalText])
+        .setDepth(this.depth);
 
       this.containers.push(container);
       this.sprites.push(img);
       this.totalTexts.push(totalText);
       this.steps.push(0);
       this.tweens.push(null);
+    });
+  }
+
+  relayout(opts: {
+    groundY: number;
+    laneStartX: number;
+    stepSizePx: number;
+    laneOffsets?: number[];
+    targetHeight?: number;
+    maxX?: number;
+  }) {
+    this.groundY = opts.groundY;
+    this.laneStartX = opts.laneStartX;
+
+    if (opts.laneOffsets) {
+      this.laneOffsets = opts.laneOffsets;
+    }
+
+    if (opts.targetHeight) {
+      this.targetHeight = opts.targetHeight;
+    }
+
+    this.containers.forEach((container, i) => {
+      const sprite = this.sprites[i];
+      const totalText = this.totalTexts[i];
+      const offset = this.laneOffsets[i] ?? 0;
+
+      container.y = this.groundY - offset;
+      container.setDepth(this.depth);
+
+      sprite.setScale(this.targetHeight / sprite.height);
+
+      const fontPx = Math.max(14, Math.round(this.targetHeight * 0.22));
+      totalText.setStyle({ fontSize: `${fontPx}px` });
+      totalText.setPosition(0, -sprite.displayHeight - Math.max(8, this.targetHeight * 0.08));
+
+      const steps = this.steps[i] ?? 0;
+      const targetX = this.laneStartX + steps * opts.stepSizePx;
+      const clampedX =
+        typeof opts.maxX === "number" ? Math.min(targetX, opts.maxX) : targetX;
+
+      container.x = clampedX;
     });
   }
 
@@ -83,7 +141,7 @@ export default class PlayerManager {
 
   moveByDice(opts: {
     playerIndex: number;
-    diceValue: number; // ✅ יכול להיות גם שלילי
+    diceValue: number;
     laneStartX: number;
     stepSizePx: number;
     maxX: number;
@@ -94,13 +152,11 @@ export default class PlayerManager {
     const idx = opts.playerIndex;
     const container = this.containers[idx];
 
-    // ✅ קריטי: אם אין שחקן/קונטיינר, לא נתקעים
     if (!container) {
       opts.onComplete?.();
       return;
     }
 
-    // stop previous tween cleanly
     const prev = this.tweens[idx];
     if (prev) {
       prev.stop();
@@ -108,7 +164,7 @@ export default class PlayerManager {
     }
 
     const currentSteps = this.steps[idx] ?? 0;
-    const nextSteps = Math.max(0, currentSteps + opts.diceValue); // clamp ל-0
+    const nextSteps = Math.max(0, currentSteps + opts.diceValue);
     this.steps[idx] = nextSteps;
 
     const t = this.totalTexts[idx];
@@ -117,7 +173,6 @@ export default class PlayerManager {
     const targetX = opts.laneStartX + nextSteps * opts.stepSizePx;
     const clampedX = Math.min(targetX, opts.maxX);
 
-    // ✅ אם כבר באותו X, לא צריך tween (ועדיין חייבים onComplete)
     if (Math.abs(container.x - clampedX) < 0.5) {
       opts.onComplete?.();
       return;

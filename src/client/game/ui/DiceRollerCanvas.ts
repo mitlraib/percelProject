@@ -1,4 +1,3 @@
-// src/client/game/ui/DiceRollerCanvas.ts
 import Phaser from "phaser";
 import DiceCanvas from "./DiceCanvas";
 
@@ -26,23 +25,33 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
   private playerName = "";
   private playerEmoji = "🎲";
 
+  private x: number;
+  private y: number;
+  private size: number;
+  private scrollFactor: number;
+  private depth: number;
+
   constructor(scene: Phaser.Scene, cfg: DiceRollerCanvasCfg) {
     super();
     this.scene = scene;
 
-    const size = cfg.size ?? 64;
+    this.x = cfg.x;
+    this.y = cfg.y;
+    this.size = cfg.size ?? 64;
+    this.scrollFactor = cfg.scrollFactor ?? 0;
+    this.depth = cfg.depth ?? 10000;
 
     this.playerName = cfg.currentPlayerName ?? "";
     this.playerEmoji = cfg.currentPlayerEmoji ?? "🎲";
 
-    this.dice = new DiceCanvas(scene, cfg.x, cfg.y, size)
-      .setScrollFactor(cfg.scrollFactor ?? 0)
-      .setDepth(cfg.depth ?? 10000);
+    this.dice = new DiceCanvas(scene, this.x, this.y, this.size)
+      .setScrollFactor(this.scrollFactor)
+      .setDepth(this.depth);
 
     this.hitZone = scene.add
-      .zone(cfg.x, cfg.y, size + 30, size + 30)
-      .setScrollFactor(cfg.scrollFactor ?? 0)
-      .setDepth((cfg.depth ?? 10000) + 1)
+      .zone(this.x, this.y, this.getHitSize(), this.getHitSize())
+      .setScrollFactor(this.scrollFactor)
+      .setDepth(this.depth + 1)
       .setInteractive({ useHandCursor: true });
 
     this.hitZone.on("pointerdown", () => {
@@ -62,13 +71,16 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
   setDisabled(v: boolean) {
     this.disabled = v;
 
-    // disable/enable input
     this.hitZone.disableInteractive();
     if (!v) {
       this.hitZone.setInteractive({ useHandCursor: true });
     }
 
     this.dice.setAlpha(v ? 0.65 : 1);
+  }
+
+  isVisible() {
+    return this.dice.visible;
   }
 
   setVisible(v: boolean) {
@@ -87,6 +99,29 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
     this.dice.setValue(Math.max(1, Math.min(6, v)));
   }
 
+  setPosition(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+
+    this.dice.setDicePosition(x, y);
+    this.hitZone.setPosition(x, y);
+  }
+
+  setSize(size: number) {
+    this.size = Math.max(48, Math.round(size));
+    this.dice.setDiceSize(this.size);
+    this.hitZone.setSize(this.getHitSize(), this.getHitSize());
+  }
+
+  resize(x: number, y: number, size: number) {
+    this.setSize(size);
+    this.setPosition(x, y);
+  }
+
+  private getHitSize() {
+    return this.size + Math.max(30, Math.round(this.size * 0.45));
+  }
+
   tryRollFromInput() {
     if (this.disabled) return;
     if (!this.dice.visible) return;
@@ -95,7 +130,6 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
     this.rollAndEmit(800);
   }
 
-  // גלגול "רגיל" (מכבד disabled + visible)
   async roll(durationMs = 800): Promise<number> {
     if (this.disabled) return this.lastRoll || this.dice.getValue();
     if (!this.dice.visible) return this.lastRoll || this.dice.getValue();
@@ -104,18 +138,9 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
     return this.rollAndEmit(durationMs);
   }
 
-  /**
-   * ✅ גלגול לבוט:
-   * - לא תלוי disabled
-   * - לא תלוי visible
-   *
-   * אם הקובייה מוסתרת (למשל בזמן תור בוט) – לא עושים אנימציה,
-   * אבל כן מגרילים ערך וכן עושים emit("roll") כדי שהמשחק יתקדם.
-   */
   async rollForced(durationMs = 800): Promise<number> {
     if (this.dice.isRolling()) return this.lastRoll || this.dice.getValue();
 
-    // אם מוסתר: בלי אנימציה, אבל עם roll event
     if (!this.dice.visible) {
       const value = Phaser.Math.Between(1, 6);
       this.lastRoll = value;
@@ -124,7 +149,6 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
       return value;
     }
 
-    // אם גלוי: אנימציה רגילה
     return this.rollAndEmit(durationMs);
   }
 

@@ -2,6 +2,15 @@ import Phaser from "phaser";
 import HudController from "./HudController";
 import DiceRollerCanvas from "../ui/DiceRollerCanvas";
 
+type SceneUIOptions = {
+  diceX: number;
+  diceY: number;
+  diceDepth?: number;
+  diceSize?: number;
+  initialName?: string;
+  initialEmoji?: string;
+};
+
 export default class SceneUI {
   private scene: Phaser.Scene;
 
@@ -11,17 +20,7 @@ export default class SceneUI {
   private isMoving = false;
   private pendingDiceVisible: boolean | null = null;
 
-  constructor(
-    scene: Phaser.Scene,
-    opts: {
-      diceX: number;
-      diceY: number;
-      diceDepth?: number;
-      diceSize?: number;
-      initialName?: string;
-      initialEmoji?: string;
-    }
-  ) {
+  constructor(scene: Phaser.Scene, opts: SceneUIOptions) {
     this.scene = scene;
 
     this.hud = new HudController(scene);
@@ -44,6 +43,12 @@ export default class SceneUI {
 
   resize() {
     this.hud.resize();
+
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+    const size = Math.round(Math.max(58, Math.min(width, height) * 0.12));
+
+    this.dice.resize(width * 0.5, height * 0.58, size);
   }
 
   setHUD(myLine: string, turnLine: string) {
@@ -71,13 +76,11 @@ export default class SceneUI {
   }
 
   setDiceVisibleDeferred(visible: boolean) {
-    // בזמן תזוזה: אם מסתירים, דוחים לסוף
     if (this.isMoving && visible === false) {
       this.pendingDiceVisible = false;
       return;
     }
 
-    // בזמן תזוזה: להציג מותר, אבל לא לדרוס "הסתר בסוף" אם עוד לא הוחלט
     if (this.isMoving && visible === true) {
       this.pendingDiceVisible = null;
       this.dice.setVisible(true);
@@ -90,8 +93,8 @@ export default class SceneUI {
 
   flushPendingDiceVisibility() {
     if (this.pendingDiceVisible === null) return;
-    const v = this.pendingDiceVisible;
+    const visible = this.pendingDiceVisible;
     this.pendingDiceVisible = null;
-    this.dice.setVisible(v);
+    this.dice.setVisible(visible);
   }
 }

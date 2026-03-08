@@ -6,10 +6,13 @@ export default class DiceCanvas extends Phaser.GameObjects.Container {
 
   private value = 1;
   private rolling = false;
+  private baseY: number;
 
   constructor(scene: Phaser.Scene, x: number, y: number, size = 90) {
     super(scene, x, y);
     scene.add.existing(this);
+
+    this.baseY = y;
 
     this.bg = scene.add.graphics();
     this.pips = scene.add.graphics();
@@ -18,7 +21,6 @@ export default class DiceCanvas extends Phaser.GameObjects.Container {
 
     this.setSize(size, size);
 
-    // חשוב ← כדי שהציור יתחיל מ-(0,0) בתוך ה-Container
     this.bg.setPosition(0, 0);
     this.pips.setPosition(0, 0);
 
@@ -38,21 +40,28 @@ export default class DiceCanvas extends Phaser.GameObjects.Container {
     return this.rolling;
   }
 
-  /**
-   * גלגול עם אנימציה קלה
-   * מחזיר את הערך הסופי
-   */
+  setDiceSize(size: number) {
+    const safeSize = Math.max(36, Math.round(size));
+    this.setSize(safeSize, safeSize);
+    this.draw(safeSize, this.value);
+  }
+
+  setDicePosition(x: number, y: number) {
+    this.baseY = y;
+    this.setPosition(x, y);
+  }
+
   async roll(durationMs = 900): Promise<number> {
     if (this.rolling) return this.value;
     this.rolling = true;
 
     const start = Date.now();
     const tickMs = 70;
+    const jumpHeight = Math.max(8, this.height * 0.12);
 
-    // אנימציית "קפיצה" קטנה של ה-Container בזמן הגלגול
     const jumpTween = this.scene.tweens.add({
       targets: this,
-      y: this.y - Math.max(8, this.height * 0.12),
+      y: this.baseY - jumpHeight,
       duration: 110,
       yoyo: true,
       repeat: Math.max(3, Math.floor(durationMs / 220)),
@@ -65,13 +74,12 @@ export default class DiceCanvas extends Phaser.GameObjects.Container {
       await this.sleep(tickMs);
     }
 
-    // ערך סופי
     const finalValue = Phaser.Math.Between(1, 6);
     this.setValue(finalValue);
 
     jumpTween.stop();
 
-    // החזרת הקוביה למיקום/סקייל נקי
+    this.setY(this.baseY);
     this.setScale(1);
     this.rolling = false;
 
@@ -84,9 +92,6 @@ export default class DiceCanvas extends Phaser.GameObjects.Container {
     });
   }
 
-  /**
-   * ציור הקוביה בצורה "יותר אמיתית" ← צל, פינות עגולות, מסגרת, נקודות פרופורציונליות
-   */
   private draw(size: number, value: number) {
     const s = Math.floor(size);
 
@@ -97,25 +102,15 @@ export default class DiceCanvas extends Phaser.GameObjects.Container {
     const border = Math.max(3, Math.round(s * 0.045));
     const shadowOffset = Math.max(3, Math.round(s * 0.06));
 
-    // צל
     this.bg.fillStyle(0x000000, 0.22);
-    this.bg.fillRoundedRect(
-      shadowOffset,
-      shadowOffset,
-      s,
-      s,
-      radius
-    );
+    this.bg.fillRoundedRect(shadowOffset, shadowOffset, s, s, radius);
 
-    // גוף לבן
     this.bg.fillStyle(0xffffff, 1);
     this.bg.fillRoundedRect(0, 0, s, s, radius);
 
-    // מסגרת
     this.bg.lineStyle(border, 0x2b2b2b, 1);
     this.bg.strokeRoundedRect(0, 0, s, s, radius);
 
-    // נקודות
     const dotR = Math.max(4, Math.round(s * 0.075));
     const c = s / 2;
     const o = s * 0.27;

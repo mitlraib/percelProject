@@ -1,4 +1,3 @@
-// src/client/game/scenes/ParallaxScene.ts
 import Phaser from "phaser";
 import type { Room } from "@colyseus/sdk";
 
@@ -16,6 +15,21 @@ import SoloVsBotMatch from "../match/SoloVsBotMatch";
 
 type Mode = "solo" | "local";
 
+type LayoutMetrics = {
+  width: number;
+  height: number;
+  totalWidth: number;
+  laneStartX: number;
+  stepSizePx: number;
+  groundOffsetY: number;
+  groundY: number;
+  laneOffsets: number[];
+  playerTargetHeight: number;
+  diceX: number;
+  diceY: number;
+  diceSize: number;
+};
+
 export default class ParallaxScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
 
@@ -30,6 +44,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
   private players!: PlayerManager;
   private camCtl!: CameraController;
+  private world!: WorldBuilder;
 
   private ui!: SceneUI;
   private momCtl!: MomController;
@@ -38,17 +53,17 @@ export default class ParallaxScene extends Phaser.Scene {
   private noamTasks!: NoamTaskManager;
 
   private currentTurnName = "";
-
-  // ✅ קריטי: עד שלא הגיע assign מהשרת — אין שחקן מקומי
   private myPlayerIndex: number | null = null;
 
-  private laneStartX = 90;
-  private stepSizePx = 90;
+  private laneStartX = 0;
+  private stepSizePx = 0;
   private groundY = 0;
+  private totalWidth = 0;
+  private laneOffsets: number[] = [];
+  private playerTargetHeight = 70;
 
   private readonly MOVE_MS = 2000;
 
-  // רצף קבוע לשחקנית 0 (הילדה) לצורך בדיקות
   private readonly fixedDiceSeqPlayer0 = [5, 2, 3, 6, 5, 6];
   private fixedDiceSeqIndex0 = 0;
 
@@ -58,7 +73,8 @@ export default class ParallaxScene extends Phaser.Scene {
 
   init(data: { mode?: Mode; playerCount?: number }) {
     this.mode = data.mode ?? (this.registry.get("mode") as Mode) ?? "local";
-    this.playerCount = data.playerCount ?? (this.registry.get("playerCount") as number) ?? 1;
+    this.playerCount =
+      data.playerCount ?? (this.registry.get("playerCount") as number) ?? 1;
   }
 
   preload() {
@@ -79,40 +95,46 @@ export default class ParallaxScene extends Phaser.Scene {
   create() {
     this.cursors = this.input.keyboard!.createCursorKeys();
 
-    const { width, height } = this.scale;
-    const totalWidth = width * 10;
+    const layout = this.computeLayout(this.scale.width, this.scale.height);
 
-    // World
-    const world = new WorldBuilder(this);
-    this.groundY = world.build({ totalWidth, brideKey: "bride", groundOffsetY: 90 }).groundY;
+    this.laneStartX = layout.laneStartX;
+    this.stepSizePx = layout.stepSizePx;
+    this.totalWidth = layout.totalWidth;
+    this.laneOffsets = layout.laneOffsets;
+    this.playerTargetHeight = layout.playerTargetHeight;
 
-    // UI
+    this.world = new WorldBuilder(this);
+    this.groundY = this.world.build({
+      totalWidth: layout.totalWidth,
+      brideKey: "bride",
+      groundOffsetY: layout.groundOffsetY,
+    }).groundY;
+
     this.ui = new SceneUI(this, {
-      diceX: width / 2,
-      diceY: height / 2,
+      diceX: layout.diceX,
+      diceY: layout.diceY,
       diceDepth: 10000,
-      diceSize: 64,
+      diceSize: layout.diceSize,
       initialName: "מיטול",
       initialEmoji: "🎲",
     });
 
-    // Managers
     this.players = new PlayerManager(this);
     this.camCtl = new CameraController(this);
-    this.camCtl.setWorldBounds(totalWidth, height);
+    this.camCtl.setWorldBounds(layout.totalWidth, layout.height);
 
-    // Spawn players
     this.players.spawn({
       textures: this.getTexturesForCount(),
       groundY: this.groundY,
       laneStartX: this.laneStartX,
+      laneOffsets: this.laneOffsets,
+      targetHeight: this.playerTargetHeight,
     });
+
     this.camCtl.follow(this.players.getContainer(0));
 
-    // Mom + tasks
     this.momCtl = new MomController(this);
 
-    // ✅ isLocalPlayerIndex חייב להיות חסין ל-null
     const isLocalIdx = (idx: number) => {
       const me = this.getMyIndex();
       return me !== null && idx === me;
@@ -126,7 +148,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
       getStepWorldXY: (step) => ({
         x: this.laneStartX + (step - 1) * this.stepSizePx,
-        y: this.groundY - 10,
+        y: this.groundY - Math.max(10, this.scale.height * 0.015),
       }),
 
       lock: () => this.lockForTask(),
@@ -141,7 +163,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
       getStepWorldXY: (step) => ({
         x: this.laneStartX + (step - 1) * this.stepSizePx,
-        y: this.groundY - 10,
+        y: this.groundY - Math.max(10, this.scale.height * 0.015),
       }),
 
       lock: () => this.lockForTask(),
@@ -153,24 +175,23 @@ export default class ParallaxScene extends Phaser.Scene {
           return;
         }
 
-        // Network: continue turn immediately so next player gets the dice; penalty animation runs when penaltyMove arrives
         this.net.sendPenalty(deltaSteps);
         done();
       },
     });
 
-    // Attach net/solo
     this.attachNetOrSolo();
 
-    // SPACE roll
-    const spaceKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    const spaceKey = this.input.keyboard?.addKey(
+      Phaser.Input.Keyboard.KeyCodes.SPACE
+    );
+
     spaceKey?.on("down", () => {
       if (this.tasks.isLocked()) return;
       if (this.noamTasks.isLocked()) return;
       if (this.ui.isDiceDisabled()) return;
 
       if (this.net) {
-        // ✅ אם עדיין אין assign, לא לגלגל
         if (this.getMyIndex() === null) return;
         if (!this.net.canRollNow()) return;
       }
@@ -178,23 +199,23 @@ export default class ParallaxScene extends Phaser.Scene {
       this.ui.dice.tryRollFromInput();
     });
 
-    // Dice roll
     this.ui.dice.onRoll(({ value }) => {
       if (this.tasks.isLocked() || this.noamTasks.isLocked()) return;
 
-      // SOLO מנוהל ע"י match
       if (this.mode === "solo") return;
 
-      // רצף קבוע לשחקן 0 בלבד (עד 6 גלגולים ראשונים)
       let finalValue = value;
       const meIdx = this.getMyIndex();
-      if (meIdx === 0 && this.fixedDiceSeqIndex0 < this.fixedDiceSeqPlayer0.length) {
+
+      if (
+        meIdx === 0 &&
+        this.fixedDiceSeqIndex0 < this.fixedDiceSeqPlayer0.length
+      ) {
         finalValue = this.fixedDiceSeqPlayer0[this.fixedDiceSeqIndex0++];
       }
 
-      // Network: שולחים לשרת ומחכים ל-"move" חזרה ממנו
       if (this.net) {
-        if (this.getMyIndex() === null) return; // ✅ אין assign
+        if (this.getMyIndex() === null) return;
         if (!this.net.canRollNow()) return;
 
         this.ui.setDiceVisibleDeferred(true);
@@ -202,15 +223,97 @@ export default class ParallaxScene extends Phaser.Scene {
         return;
       }
 
-      // fallback local single
       this.playMoveTurn(0, finalValue);
     });
 
     this.refreshHUD();
-    this.scale.on("resize", () => this.ui.resize());
+    this.scale.on("resize", this.handleResize, this);
   }
 
-  // ---------------- attach net/solo ----------------
+  private computeLayout(width: number, height: number): LayoutMetrics {
+    const safeWidth = Math.max(width, 320);
+    const safeHeight = Math.max(height, 480);
+
+    const laneStartX = Math.round(safeWidth * 0.1);
+    const stepSizePx = Math.round(
+      Math.max(52, Math.min(safeWidth * 0.12, 110))
+    );
+
+    const stepsCount = 32;
+    const totalWidth =
+      laneStartX + stepsCount * stepSizePx + Math.round(safeWidth * 0.25);
+
+    const groundOffsetY = Math.round(safeHeight * 0.15);
+
+    const playerTargetHeight = Math.round(
+      Math.max(48, Math.min(safeHeight * 0.12, safeWidth * 0.15))
+    );
+
+    const laneOffsets = [
+      0,
+      Math.round(playerTargetHeight * 0.65),
+      Math.round(playerTargetHeight * 1.3),
+      Math.round(playerTargetHeight * 1.95),
+    ];
+
+    const diceSize = Math.round(
+      Math.max(58, Math.min(safeWidth, safeHeight) * 0.12)
+    );
+
+    return {
+      width: safeWidth,
+      height: safeHeight,
+      totalWidth,
+      laneStartX,
+      stepSizePx,
+      groundOffsetY,
+      groundY: 0,
+      laneOffsets,
+      playerTargetHeight,
+      diceX: safeWidth * 0.5,
+      diceY: safeHeight * 0.58,
+      diceSize,
+    };
+  }
+
+  private handleResize(gameSize: Phaser.Structs.Size) {
+    const layout = this.computeLayout(gameSize.width, gameSize.height);
+
+    this.laneStartX = layout.laneStartX;
+    this.stepSizePx = layout.stepSizePx;
+    this.totalWidth = layout.totalWidth;
+    this.laneOffsets = layout.laneOffsets;
+    this.playerTargetHeight = layout.playerTargetHeight;
+
+    const worldResult = this.world?.resize({
+      totalWidth: layout.totalWidth,
+      groundOffsetY: layout.groundOffsetY,
+      brideKey: "bride",
+    });
+
+    if (worldResult) {
+      this.groundY = worldResult.groundY;
+    }
+
+    this.camCtl?.setWorldBounds(layout.totalWidth, layout.height);
+
+    this.players?.relayout({
+      groundY: this.groundY,
+      laneStartX: this.laneStartX,
+      stepSizePx: this.stepSizePx,
+      laneOffsets: this.laneOffsets,
+      targetHeight: this.playerTargetHeight,
+      maxX: this.camCtl.getMaxXPadding(40),
+    });
+
+    this.ui?.resize();
+    this.refreshHUD();
+
+    const followIdx = this.getMyIndex() ?? 0;
+    this.time.delayedCall(50, () => {
+      this.camCtl?.follow(this.players?.getContainer(followIdx));
+    });
+  }
 
   private attachNetOrSolo() {
     if (this.mode === "solo") {
@@ -225,6 +328,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
     const room = this.registry.get("room") as Room | undefined;
     const existingNet = this.registry.get("net") as NetGameController | undefined;
+
     if (!room) {
       this.game.events.once("room-ready", () => {
         const r = this.registry.get("room") as Room | undefined;
@@ -251,7 +355,6 @@ export default class ParallaxScene extends Phaser.Scene {
         return;
       }
 
-      // ✅ מקבלים assign מהשרת
       if (s.myIndex !== null && s.myIndex !== undefined) {
         this.myPlayerIndex = s.myIndex;
       }
@@ -260,13 +363,12 @@ export default class ParallaxScene extends Phaser.Scene {
       const emojis = ["👧", "🐶", "🐻", "🎮"];
 
       const me = this.getMyIndex();
-      const myIdxForUI = me ?? 0; // רק לתצוגה עד assign
+      const myIdxForUI = me ?? 0;
 
       const myName = names[myIdxForUI] ?? "שחקן";
       const myEmoji = emojis[myIdxForUI] ?? "🎮";
       this.ui.setDicePlayer(myName, myEmoji);
 
-      // ✅ אם אין assign עדיין, לא מאפשרים גלגול
       if (me === null) {
         this.ui.setDiceDisabled(true);
         this.ui.setDiceVisibleDeferred(false);
@@ -278,45 +380,67 @@ export default class ParallaxScene extends Phaser.Scene {
       this.currentTurnName = names[s.currentTurn] ?? "";
       this.refreshHUD();
 
-      // follow רק אם יש assign
       if (me !== null) {
         this.camCtl.follow(this.players.getContainer(me));
       }
     });
 
-    this.net.on("move", ({ playerIndex, value }: { playerIndex: number; value: number }) => {
-      this.playMoveTurn(playerIndex, value);
-    });
+    this.net.on(
+      "move",
+      ({ playerIndex, value }: { playerIndex: number; value: number }) => {
+        this.playMoveTurn(playerIndex, value);
+      }
+    );
 
-    this.net.on("penaltyMove", ({ playerIndex, deltaSteps }: { playerIndex: number; deltaSteps: number }) => {
-      this.playPenaltyMove(playerIndex, deltaSteps);
-    });
+    this.net.on(
+      "penaltyMove",
+      ({
+        playerIndex,
+        deltaSteps,
+      }: {
+        playerIndex: number;
+        deltaSteps: number;
+      }) => {
+        this.playPenaltyMove(playerIndex, deltaSteps);
+      }
+    );
   }
 
   private attachSolo() {
-    this.soloMatch = new SoloVsBotMatch(this, this.ui.dice as any, { name: "מיטול", emoji: "👰‍♀️" });
-
-    this.soloMatch.on("turn-changed", (e: { player: { isBot: boolean; name: string } }) => {
-      this.soloIsBotTurn = e.player.isBot;
-      this.currentTurnName = e.player.name;
-
-      this.ui.setDiceVisibleDeferred(!e.player.isBot);
-      this.ui.setDiceDisabled(e.player.isBot);
-
-      this.refreshHUD();
+    this.soloMatch = new SoloVsBotMatch(this, this.ui.dice as any, {
+      name: "מיטול",
+      emoji: "👰‍♀️",
     });
 
-    this.soloMatch.on("dice-rolled", (e: { player: { name: string }; value: number }) => {
-      const idx = e.player.name === "מיטול" ? 0 : 1;
-      this.playMoveTurn(idx, e.value, () => this.soloMatch?.advanceTurn());
-    });
+    this.soloMatch.on(
+      "turn-changed",
+      (e: { player: { isBot: boolean; name: string } }) => {
+        this.soloIsBotTurn = e.player.isBot;
+        this.currentTurnName = e.player.name;
+
+        this.ui.setDiceVisibleDeferred(!e.player.isBot);
+        this.ui.setDiceDisabled(e.player.isBot);
+
+        this.refreshHUD();
+      }
+    );
+
+    this.soloMatch.on(
+      "dice-rolled",
+      (e: { player: { name: string }; value: number }) => {
+        const idx = e.player.name === "מיטול" ? 0 : 1;
+        this.playMoveTurn(idx, e.value, () => this.soloMatch?.advanceTurn());
+      }
+    );
 
     this.soloMatch.start();
   }
 
-  // ---------------- turns / movement ----------------
-
-  private playMoveTurn(playerIndex: number, diceValue: number, onTurnFinished?: () => void) {
+  private playMoveTurn(
+    playerIndex: number,
+    diceValue: number,
+    onTurnFinished?: () => void
+  ) {
     this.ui.setLastRoll(diceValue);
     this.ui.setMoving(true);
 
@@ -333,13 +457,14 @@ export default class ParallaxScene extends Phaser.Scene {
 
         const stepsNow = this.players.getSteps(playerIndex);
 
-        // שרשרת משימות: אמא → נועם
         this.tasks.handleAfterMove(playerIndex, stepsNow, () => {
           this.noamTasks.handleAfterMove(playerIndex, stepsNow, () => {
             const followIdx = this.getMyIndex() ?? 0;
 
             this.refreshHUD();
-            this.time.delayedCall(100, () => this.camCtl.follow(this.players.getContainer(followIdx)));
+            this.time.delayedCall(100, () =>
+              this.camCtl.follow(this.players.getContainer(followIdx))
+            );
 
             this.ui.flushPendingDiceVisibility();
             onTurnFinished?.();
@@ -349,7 +474,11 @@ export default class ParallaxScene extends Phaser.Scene {
     });
   }
 
-  private playPenaltyMove(playerIndex: number, deltaSteps: number, done?: () => void) {
+  private playPenaltyMove(
+    playerIndex: number,
+    deltaSteps: number,
+    done?: () => void
+  ) {
     this.ui.setMoving(true);
 
     this.players.moveByDice({
@@ -364,7 +493,9 @@ export default class ParallaxScene extends Phaser.Scene {
         this.ui.setMoving(false);
 
         const followIdx = this.getMyIndex() ?? 0;
-        this.time.delayedCall(80, () => this.camCtl.follow(this.players.getContainer(followIdx)));
+        this.time.delayedCall(80, () =>
+          this.camCtl.follow(this.players.getContainer(followIdx))
+        );
 
         this.refreshHUD();
         done?.();
@@ -372,13 +503,9 @@ export default class ParallaxScene extends Phaser.Scene {
     });
   }
 
-  // ---------------- lock/unlock ----------------
-
   private lockForTask() {
     this.ui.setDiceDisabled(true);
     this.ui.setDiceVisibleDeferred(false);
-
-    // SOLO: להקפיא בוט בזמן משימה
     this.soloMatch?.setPaused(true);
   }
 
@@ -412,8 +539,6 @@ export default class ParallaxScene extends Phaser.Scene {
     this.refreshHUD();
   }
 
-  // ---------------- identity / hud ----------------
-
   private getMyIndex(): number | null {
     if (this.mode === "solo") return 0;
     return this.myPlayerIndex;
@@ -426,15 +551,17 @@ export default class ParallaxScene extends Phaser.Scene {
     const myIdx = me ?? 0;
 
     const myName = names[myIdx] ?? "שחקן";
-    const points = this.players.getSteps(myIdx);
+    const points = this.players?.getSteps(myIdx) ?? 0;
 
     const icons = ["👧", "🐶", "🐻", "🎮"];
     const icon = icons[myIdx] ?? "🎮";
 
     const myLine = `${icon} ${myName}  •  ${points} נק'`;
-    const turnLine = this.currentTurnName ? `🎯 תור  ·  ${this.currentTurnName}` : "";
+    const turnLine = this.currentTurnName
+      ? `🎯 תור  •  ${this.currentTurnName}`
+      : "";
 
-    this.ui.setHUD(myLine, turnLine);
+    this.ui?.setHUD(myLine, turnLine);
   }
 
   private getCharNames(): string[] {
@@ -453,12 +580,12 @@ export default class ParallaxScene extends Phaser.Scene {
     return ["ילדה", "כלב", "דוב", "דוב"];
   }
 
-  // ---------------- cleanup ----------------
-
   shutdown() {
     try {
       this.room?.leave();
     } catch {}
+
+    this.scale.off("resize", this.handleResize, this);
 
     this.net?.destroy();
     this.net = undefined;
@@ -469,6 +596,7 @@ export default class ParallaxScene extends Phaser.Scene {
     this.tasks?.destroy();
     this.noamTasks?.destroy();
 
+    this.world?.destroy();
     this.players?.destroy();
     this.momCtl?.destroy();
     this.ui?.destroy();
@@ -478,7 +606,7 @@ export default class ParallaxScene extends Phaser.Scene {
     if (this.tasks?.isLocked() || this.noamTasks?.isLocked()) return;
 
     const cam = this.cameras.main;
-    const speed = 10;
+    const speed = Math.max(8, this.scale.width * 0.008);
 
     if (this.cursors.left?.isDown) cam.scrollX -= speed;
     else if (this.cursors.right?.isDown) cam.scrollX += speed;
