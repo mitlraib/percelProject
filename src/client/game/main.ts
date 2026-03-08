@@ -10,10 +10,10 @@ export default function startGame() {
     backgroundColor: "#222222",
 
     scale: {
-      mode: Phaser.Scale.FIT,
+      mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
-      width: 800,
-      height: 520,
+      width: window.innerWidth,
+      height: window.innerHeight,
     },
 
     physics: {

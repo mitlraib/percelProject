@@ -21,9 +21,10 @@ export default class VendorsTaskUI {
   private currentInput = "";
   private found = new Set<string>();
 
-  private keydownHandler?: (ev: KeyboardEvent) => void;
   private resolve?: (r: VendorsTaskUIResult) => void;
   private finished = false;
+
+  private htmlInput?: HTMLInputElement;
 
   constructor(scene: Phaser.Scene, canon: VendorsCanon) {
     this.scene = scene;
@@ -62,11 +63,17 @@ export default class VendorsTaskUI {
     panelBg.strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 22);
 
     const title = this.scene.add
-      .text(-panelW / 2 + 24, -panelH / 2 + 18, `כתבי ${needCount} ספקים / שירותים שצריך לסגור לפני החתונה תוך דקה !`, {
-        fontFamily: "Arial Black",
-        fontSize: "20px",
-        color: "#111",
-      })
+      .text(
+        -panelW / 2 + 24,
+        -panelH / 2 + 18,
+        `כתבי ${needCount} ספקים / שירותים שצריך לסגור לפני החתונה תוך דקה !`,
+        {
+          fontFamily: "Arial Black",
+          fontSize: "20px",
+          color: "#111",
+          wordWrap: { width: panelW - 140, useAdvancedWrap: true },
+        }
+      )
       .setOrigin(0, 0);
 
     const timer = this.scene.add
@@ -79,21 +86,27 @@ export default class VendorsTaskUI {
     this.timerText = timer;
 
     const hint = this.scene.add
-      .text(-panelW / 2 + 24, -panelH / 2 + 56, "טיפ: כתבי ספק אחד ולחצי אנטר. אפשר גם כמה יחד עם פסיקים.", {
-        fontFamily: "Arial",
-        fontSize: "16px",
-        color: "#333",
-      })
+      .text(
+        -panelW / 2 + 24,
+        -panelH / 2 + 80,
+        "טיפ: כתבי ספק אחד ולחצי Enter במקלדת. אפשר גם כמה יחד עם פסיקים.",
+        {
+          fontFamily: "Arial",
+          fontSize: "16px",
+          color: "#333",
+          wordWrap: { width: panelW - 48, useAdvancedWrap: true },
+        }
+      )
       .setOrigin(0, 0);
 
     const inputBg = this.scene.add.graphics();
     inputBg.fillStyle(0xf3f3f3, 1);
     inputBg.lineStyle(2, 0x111111, 0.35);
-    inputBg.fillRoundedRect(-panelW / 2 + 24, -40, panelW - 48, 58, 14);
-    inputBg.strokeRoundedRect(-panelW / 2 + 24, -40, panelW - 48, 58, 14);
+    inputBg.fillRoundedRect(-panelW / 2 + 24, -10, panelW - 48, 58, 14);
+    inputBg.strokeRoundedRect(-panelW / 2 + 24, -10, panelW - 48, 58, 14);
 
     const inputLabel = this.scene.add
-      .text(-panelW / 2 + 40, -26, "הקלידי כאן:", {
+      .text(-panelW / 2 + 40, 4, "הקלידי כאן:", {
         fontFamily: "Arial",
         fontSize: "14px",
         color: "#555",
@@ -101,16 +114,17 @@ export default class VendorsTaskUI {
       .setOrigin(0, 0);
 
     const inputText = this.scene.add
-      .text(-panelW / 2 + 40, -6, "", {
+      .text(-panelW / 2 + 40, 24, "", {
         fontFamily: "Arial",
         fontSize: "18px",
         color: "#111",
+        wordWrap: { width: panelW - 90, useAdvancedWrap: true },
       })
       .setOrigin(0, 0);
     this.inputText = inputText;
 
     const listTitle = this.scene.add
-      .text(-panelW / 2 + 24, 40, "נכנסו (0/10):", {
+      .text(-panelW / 2 + 24, 80, `נכנסו (0/${needCount}):`, {
         fontFamily: "Arial Black",
         fontSize: "16px",
         color: "#111",
@@ -118,7 +132,7 @@ export default class VendorsTaskUI {
       .setOrigin(0, 0);
 
     const listText = this.scene.add
-      .text(-panelW / 2 + 24, 70, "", {
+      .text(-panelW / 2 + 24, 110, "", {
         fontFamily: "Arial",
         fontSize: "18px",
         color: "#111",
@@ -129,33 +143,7 @@ export default class VendorsTaskUI {
 
     root.add([overlay, panelBg, title, timer, hint, inputBg, inputLabel, inputText, listTitle, listText]);
 
-    const kb = this.scene.input.keyboard;
-    if (!kb) {
-      // בלי מקלדת → לא נתקעים
-      this.finish({ ok: false, found: [] });
-      return Promise.resolve({ ok: false, found: [] });
-    }
-
-    this.keydownHandler = (ev: KeyboardEvent) => {
-      if (!this.uiRoot || this.finished) return;
-      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
-
-      if (ev.key === "Enter") {
-        this.submitLine(needCount);
-        return;
-      }
-      if (ev.key === "Backspace") {
-        this.currentInput = this.currentInput.slice(0, -1);
-        this.renderInput();
-        return;
-      }
-      if (ev.key.length === 1) {
-        this.currentInput += ev.key;
-        this.renderInput();
-      }
-    };
-
-    kb.on("keydown", this.keydownHandler);
+    this.createMobileInput(needCount);
 
     this.timerEvent = this.scene.time.addEvent({
       delay: 1000,
@@ -163,11 +151,15 @@ export default class VendorsTaskUI {
       callback: () => {
         this.remaining -= 1;
         this.renderTimer();
-        if (this.remaining <= 0) this.finish({ ok: false, found: Array.from(this.found) });
+
+        if (this.remaining <= 0) {
+          this.finish({ ok: false, found: Array.from(this.found) });
+        }
       },
     });
 
     this.renderTimer();
+    this.renderInput();
     this.renderList(needCount);
 
     return new Promise<VendorsTaskUIResult>((resolve) => {
@@ -177,9 +169,7 @@ export default class VendorsTaskUI {
 
   cleanup() {
     this.stopTimer();
-    const kb = this.scene.input.keyboard;
-    if (kb && this.keydownHandler) kb.off("keydown", this.keydownHandler);
-    this.keydownHandler = undefined;
+    this.destroyHtmlInput();
 
     this.uiRoot?.destroy(true);
     this.uiRoot = undefined;
@@ -192,10 +182,71 @@ export default class VendorsTaskUI {
     this.finished = false;
   }
 
+  private createMobileInput(needCount: number) {
+    this.destroyHtmlInput();
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "כתבי ספק...";
+    input.autocomplete = "off";
+    input.autocapitalize = "off";
+    input.spellcheck = false;
+    input.dir = "rtl";
+
+    input.style.position = "fixed";
+    input.style.left = "50%";
+    input.style.bottom = "24px";
+    input.style.transform = "translateX(-50%)";
+    input.style.width = "min(92vw, 700px)";
+    input.style.height = "48px";
+    input.style.padding = "0 14px";
+    input.style.fontSize = "18px";
+    input.style.borderRadius = "12px";
+    input.style.border = "2px solid #111";
+    input.style.zIndex = "999999";
+    input.style.background = "#ffffff";
+    input.style.color = "#111111";
+
+    document.body.appendChild(input);
+    this.htmlInput = input;
+
+    input.addEventListener("input", () => {
+      this.currentInput = input.value;
+      this.renderInput();
+    });
+
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        this.submitLine(needCount);
+        input.value = "";
+        this.currentInput = "";
+        this.renderInput();
+
+        window.setTimeout(() => {
+          input.focus();
+        }, 0);
+      }
+    });
+
+    // חשוב: לפתוח מקלדת בנייד
+    window.setTimeout(() => {
+      input.focus();
+    }, 50);
+  }
+
+  private destroyHtmlInput() {
+    if (this.htmlInput) {
+      this.htmlInput.remove();
+      this.htmlInput = undefined;
+    }
+  }
+
   private submitLine(needCount: number) {
     const raw = this.currentInput.trim();
     this.currentInput = "";
     this.renderInput();
+
     if (!raw) return;
 
     const parts = raw
@@ -203,12 +254,10 @@ export default class VendorsTaskUI {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    let anyAccepted = false;
-
     for (const p of parts) {
       const canon = this.canon.toCanonical(p);
       if (!canon) continue;
-      anyAccepted = true;
+
       this.found.add(canon);
 
       if (this.found.size >= needCount) {
@@ -238,6 +287,7 @@ export default class VendorsTaskUI {
 
   private renderTimer() {
     if (!this.timerText) return;
+
     const m = Math.floor(this.remaining / 60);
     const s = this.remaining % 60;
     this.timerText.setText(`⏳ ${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
