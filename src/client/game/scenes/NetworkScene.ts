@@ -11,12 +11,11 @@ type Mode = "solo" | "local";
 /**
  * Resolve the Colyseus WebSocket endpoint.
  *
- * - In development: always `ws://localhost:2567`
- * - In production: use SERVER_URL from env (Vite: VITE_SERVER_URL, Parcel: PARCEL_SERVER_URL or SERVER_URL)
- *   e.g. https://party-arena-server.onrender.com → wss://party-arena-server.onrender.com
- * - If no env URL, fall back to the current page origin.
- *
- * Uses optional chaining so this works with both Parcel (no import.meta.env.PROD) and Vite.
+ * Priority:
+ * 1. If VITE_SERVER_URL is defined (on Render / production), use it:
+ *    e.g. https://percelproject.onrender.com → wss://percelproject.onrender.com
+ * 2. Otherwise, if running on localhost, use ws://localhost:2567 for local dev.
+ * 3. Otherwise, fall back to the current page origin (for advanced proxy setups).
  */
 function getColyseusWsUrl(): string {
   const DEV_WS = "ws://localhost:2567";
@@ -27,17 +26,10 @@ function getColyseusWsUrl(): string {
 
   // Access env in a way that works with both Parcel and Vite, without relying on typed ImportMetaEnv.
   const env = ((import.meta as any).env ?? {}) as {
-    PROD?: boolean;
-    NODE_ENV?: string;
     VITE_SERVER_URL?: string;
   };
 
-  const isProd = env.PROD === true || env.NODE_ENV === "production";
-
-  if (!isProd) {
-    return DEV_WS;
-  }
-
+  // 1) Explicit server URL from env (Render production).
   const envUrl = env.VITE_SERVER_URL;
 
   if (envUrl) {
@@ -47,11 +39,17 @@ function getColyseusWsUrl(): string {
       // host includes hostname + optional :port
       return `${wsProtocol}//${httpUrl.host}`;
     } catch {
-      // If env is malformed, just fall back below
+      // If env is malformed, just fall back below.
     }
   }
 
-  // Fallback: same host as the page (works if you proxy Colyseus through the client domain)
+  // 2) Local dev: keep using localhost.
+  const host = window.location.hostname;
+  if (host === "localhost" || host === "127.0.0.1") {
+    return DEV_WS;
+  }
+
+  // 3) Fallback: same host as the page (works if you proxy Colyseus through the client domain).
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}`;
 }
