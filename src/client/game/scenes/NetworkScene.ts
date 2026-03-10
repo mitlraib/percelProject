@@ -25,18 +25,20 @@ function getColyseusWsUrl(): string {
     return DEV_WS;
   }
 
-  // Parcel doesn't set import.meta.env.PROD; Vite does. Also support process.env.NODE_ENV.
-  const isProd =
-    import.meta.env?.PROD === true ||
-    (typeof process !== "undefined" && process.env?.NODE_ENV === "production");
+  // Access env in a way that works with both Parcel and Vite, without relying on typed ImportMetaEnv.
+  const env = ((import.meta as any).env ?? {}) as {
+    PROD?: boolean;
+    NODE_ENV?: string;
+    VITE_SERVER_URL?: string;
+  };
+
+  const isProd = env.PROD === true || env.NODE_ENV === "production";
 
   if (!isProd) {
     return DEV_WS;
   }
 
-  const envUrl =
-    (import.meta.env?.VITE_SERVER_URL as string | undefined) ||
-    (typeof process !== "undefined" && (process.env?.PARCEL_SERVER_URL || process.env?.SERVER_URL));
+  const envUrl = env.VITE_SERVER_URL;
 
   if (envUrl) {
     try {
