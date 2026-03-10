@@ -8,14 +8,50 @@ import NetGameController from "../controllers/NetGameController";
 
 type Mode = "solo" | "local";
 
-const COLYSEUS_PORT = 2567;
-
-/** WebSocket URL so the game works on phone: use same host as the page, not localhost. */
+/**
+ * Resolve the Colyseus WebSocket endpoint.
+ *
+ * - In development: always `ws://localhost:2567`
+ * - In production: use SERVER_URL from env (Vite: VITE_SERVER_URL, Parcel: PARCEL_SERVER_URL or SERVER_URL)
+ *   e.g. https://party-arena-server.onrender.com → wss://party-arena-server.onrender.com
+ * - If no env URL, fall back to the current page origin.
+ *
+ * Uses optional chaining so this works with both Parcel (no import.meta.env.PROD) and Vite.
+ */
 function getColyseusWsUrl(): string {
-  if (typeof window === "undefined") return "ws://localhost:2567";
-  const host = window.location.hostname;
+  const DEV_WS = "ws://localhost:2567";
+
+  if (typeof window === "undefined") {
+    return DEV_WS;
+  }
+
+  // Parcel doesn't set import.meta.env.PROD; Vite does. Also support process.env.NODE_ENV.
+  const isProd =
+    import.meta.env?.PROD === true ||
+    (typeof process !== "undefined" && process.env?.NODE_ENV === "production");
+
+  if (!isProd) {
+    return DEV_WS;
+  }
+
+  const envUrl =
+    (import.meta.env?.VITE_SERVER_URL as string | undefined) ||
+    (typeof process !== "undefined" && (process.env?.PARCEL_SERVER_URL || process.env?.SERVER_URL));
+
+  if (envUrl) {
+    try {
+      const httpUrl = new URL(envUrl);
+      const wsProtocol = httpUrl.protocol === "https:" ? "wss:" : "ws:";
+      // host includes hostname + optional :port
+      return `${wsProtocol}//${httpUrl.host}`;
+    } catch {
+      // If env is malformed, just fall back below
+    }
+  }
+
+  // Fallback: same host as the page (works if you proxy Colyseus through the client domain)
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${host}:${COLYSEUS_PORT}`;
+  return `${protocol}//${window.location.host}`;
 }
 
 export default class NetworkScene extends Phaser.Scene {
