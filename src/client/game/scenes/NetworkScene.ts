@@ -8,14 +8,13 @@ import NetGameController from "../controllers/NetGameController";
 
 type Mode = "solo" | "local";
 
-/**
- * Resolve the Colyseus WebSocket endpoint.
+/** Resolve the Colyseus WebSocket endpoint.
  *
- * Priority:
- * 1. If VITE_SERVER_URL is defined (on Render / production), use it:
- *    e.g. https://percelproject.onrender.com → wss://percelproject.onrender.com
- * 2. Otherwise, if running on localhost, use ws://localhost:2567 for local dev.
- * 3. Otherwise, fall back to the current page origin (for advanced proxy setups).
+ * - When running from localhost → ws://localhost:2567  (local dev)
+ * - When running from anywhere else (e.g. Render client) → wss://percelproject.onrender.com
+ *
+ * This hard-wires the production server URL so phones and the deployed client never try to
+ * talk to the client domain.
  */
 function getColyseusWsUrl(): string {
   const DEV_WS = "ws://localhost:2567";
@@ -24,34 +23,14 @@ function getColyseusWsUrl(): string {
     return DEV_WS;
   }
 
-  // Access env in a way that works with both Parcel and Vite, without relying on typed ImportMetaEnv.
-  const env = ((import.meta as any).env ?? {}) as {
-    VITE_SERVER_URL?: string;
-  };
-
-  // 1) Explicit server URL from env (Render production).
-  const envUrl = env.VITE_SERVER_URL;
-
-  if (envUrl) {
-    try {
-      const httpUrl = new URL(envUrl);
-      const wsProtocol = httpUrl.protocol === "https:" ? "wss:" : "ws:";
-      // host includes hostname + optional :port
-      return `${wsProtocol}//${httpUrl.host}`;
-    } catch {
-      // If env is malformed, just fall back below.
-    }
-  }
-
-  // 2) Local dev: keep using localhost.
+  // Local dev: keep using localhost.
   const host = window.location.hostname;
   if (host === "localhost" || host === "127.0.0.1") {
     return DEV_WS;
   }
 
-  // 3) Fallback: same host as the page (works if you proxy Colyseus through the client domain).
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}`;
+  // Production / non-localhost: always talk directly to the Colyseus server on Render.
+  return "wss://percelproject.onrender.com";
 }
 
 export default class NetworkScene extends Phaser.Scene {
