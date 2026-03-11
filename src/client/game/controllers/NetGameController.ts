@@ -43,12 +43,14 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
       this.playersCount = p.count;
       this.recomputeCanRoll();
       this.emitState();
+      if (p.count >= 2) this.room.send("sync");
     });
 
     room.onMessage("ready", (p: ReadyPayload) => {
       this.ready = !!p.ok;
       this.recomputeCanRoll();
       this.emitState();
+      if (p.ok) this.room.send("sync");
     });
 
     room.onMessage("assign", (p: AssignPayload) => {

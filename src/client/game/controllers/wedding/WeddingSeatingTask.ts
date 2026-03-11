@@ -13,8 +13,6 @@ type SeatView = {
   seatIndex: number;
   x: number;
   y: number;
-  w: number;
-  h: number;
   zone: Phaser.GameObjects.Zone;
   bg: Phaser.GameObjects.Rectangle;
 };
@@ -47,7 +45,9 @@ export default class WeddingSeatingTask {
   private rulesText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
-  private submitBtn!: Phaser.GameObjects.Container;
+
+  private submitBtnBg?: Phaser.GameObjects.Rectangle;
+  private submitBtnLabel?: Phaser.GameObjects.Text;
 
   private seats: SeatView[] = [];
   private guestCards: GuestCardView[] = [];
@@ -304,27 +304,6 @@ export default class WeddingSeatingTask {
     });
   }
 
-  destroy() {
-    this.timerEvent?.remove(false);
-    this.introTimer?.remove(false);
-    this.destroyInputHandlers();
-
-    this.root?.destroy(true);
-    this.backdrop?.destroy();
-    this.panel?.destroy();
-    this.titleText?.destroy();
-    this.rulesText?.destroy();
-    this.timerText?.destroy();
-    this.statusText?.destroy();
-
-    this.introBackdrop?.destroy();
-    this.introDad?.destroy();
-    this.introBubble?.destroy();
-
-    this.seats = [];
-    this.guestCards = [];
-  }
-
   private buildRulesText(): string {
     return [
       "חוקים:",
@@ -390,8 +369,6 @@ export default class WeddingSeatingTask {
           seatIndex: s,
           x: pos.x,
           y: pos.y,
-          w: 92,
-          h: 52,
           zone,
           bg,
         });
@@ -403,13 +380,13 @@ export default class WeddingSeatingTask {
     const guests = this.canon.guests;
     const cardW = 112;
     const cardH = 36;
-    const hitW = 150;
-    const hitH = 56;
+    const hitW = 118;
+    const hitH = 42;
 
-    const leftX = this.panel.x - 285;
-    const rightX = this.panel.x + 285;
-    const startY = this.panel.y - 20;
-    const gapY = 62;
+    const leftX = this.panel.x - 300;
+    const rightX = this.panel.x + 300;
+    const startY = this.panel.y - 35;
+    const gapY = 74;
 
     guests.forEach((guest, index) => {
       const isLeft = index < 3;
@@ -619,57 +596,39 @@ export default class WeddingSeatingTask {
   private createButtons(depth: number) {
     const buttonY = this.panel.y + this.panel.height / 2 - 34;
 
-    this.submitBtn = this.createButton(
-      this.panel.x,
-      buttonY,
-      150,
-      44,
-      "בדיקה",
-      0x6dbb75,
-      () => this.submit()
-    ).setDepth(depth);
+    this.submitBtnBg = this.scene.add
+      .rectangle(this.panel.x, buttonY, 150, 44, 0x6dbb75, 1)
+      .setStrokeStyle(2, 0x3a2a2a)
+      .setScrollFactor(0)
+      .setDepth(depth + 100)
+      .setInteractive({ useHandCursor: true });
 
-    this.root.add(this.submitBtn);
-  }
-
-  private createButton(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    text: string,
-    color: number,
-    onClick: () => void
-  ): Phaser.GameObjects.Container {
-    const bg = this.scene.add
-      .rectangle(0, 0, w, h, color, 1)
-      .setStrokeStyle(2, 0x3a2a2a);
-
-    const label = this.scene.add
-      .text(0, 0, text, {
+    this.submitBtnLabel = this.scene.add
+      .text(this.panel.x, buttonY, "בדיקה", {
         fontFamily: "Arial",
         fontSize: "18px",
         color: "#ffffff",
         fontStyle: "bold",
       })
-      .setOrigin(0.5);
-
-    const hit = this.scene.add
-      .rectangle(0, 0, w, h, 0x000000, 0.001)
-      .setInteractive({ useHandCursor: true });
-
-    const c = this.scene.add
-      .container(x, y, [bg, label, hit])
+      .setOrigin(0.5)
       .setScrollFactor(0)
-      .setDepth(30000);
+      .setDepth(depth + 101);
 
-    hit.on("pointerover", () => c.setScale(1.04));
-    hit.on("pointerout", () => c.setScale(1));
-    hit.on("pointerdown", () => {
-      if (!this.finished) onClick();
+    this.submitBtnBg.on("pointerover", () => {
+      this.submitBtnBg?.setScale(1.04);
+      this.submitBtnLabel?.setScale(1.04);
     });
 
-    return c;
+    this.submitBtnBg.on("pointerout", () => {
+      this.submitBtnBg?.setScale(1);
+      this.submitBtnLabel?.setScale(1);
+    });
+
+    this.submitBtnBg.on("pointerdown", () => {
+      if (!this.finished) {
+        this.submit();
+      }
+    });
   }
 
   private submit() {
@@ -691,15 +650,17 @@ export default class WeddingSeatingTask {
         ease: "Sine.easeInOut",
       });
 
+      const baseX = this.panel.x;
+
       this.scene.tweens.add({
         targets: this.panel,
-        x: this.panel.x + 6,
+        x: baseX + 6,
         duration: 45,
         yoyo: true,
         repeat: 3,
         ease: "Sine.easeInOut",
         onComplete: () => {
-          this.panel.x = this.scene.scale.width / 2;
+          this.panel.x = baseX;
         },
       });
 
@@ -730,6 +691,8 @@ export default class WeddingSeatingTask {
       this.timerText,
       this.statusText,
       this.root,
+      this.submitBtnBg,
+      this.submitBtnLabel,
     ].filter(Boolean) as Phaser.GameObjects.GameObject[];
 
     this.scene.tweens.add({
@@ -742,5 +705,28 @@ export default class WeddingSeatingTask {
         this.opts.onComplete?.(result);
       },
     });
+  }
+
+  destroy() {
+    this.timerEvent?.remove(false);
+    this.introTimer?.remove(false);
+    this.destroyInputHandlers();
+
+    this.root?.destroy(true);
+    this.backdrop?.destroy();
+    this.panel?.destroy();
+    this.titleText?.destroy();
+    this.rulesText?.destroy();
+    this.timerText?.destroy();
+    this.statusText?.destroy();
+    this.submitBtnBg?.destroy();
+    this.submitBtnLabel?.destroy();
+
+    this.introBackdrop?.destroy();
+    this.introDad?.destroy();
+    this.introBubble?.destroy();
+
+    this.seats = [];
+    this.guestCards = [];
   }
 }
