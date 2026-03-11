@@ -114,6 +114,11 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
     this.room.send("playerMeta", { name, avatar });
   }
 
+  /** מבקש מהשרת שליחת מצב מלא – שימושי כשמחכים לשחקנים כדי לתפוס ready */
+  requestSync() {
+    this.room.send("sync");
+  }
+
   private recomputeCanRoll() {
     this.canRollNowFlag =
       this.ready &&
