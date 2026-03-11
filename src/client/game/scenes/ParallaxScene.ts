@@ -368,7 +368,7 @@ export default class ParallaxScene extends Phaser.Scene {
       this.net.sendPlayerMeta(displayName, avatarDataUrl);
     }
 
-    this.net.on("state", (s: NetStateView) => {
+    const applyNetState = (s: NetStateView) => {
       if (!s.ready) {
         this.ui.setDicePlayer("מחכה לשחקנים…", "⏳");
         this.ui.setDiceDisabled(true);
@@ -383,29 +383,33 @@ export default class ParallaxScene extends Phaser.Scene {
       }
 
       const fallbackNames = this.getCharNames();
-      const names = s.names && s.names.length ? s.names.map((n, i) => n ?? fallbackNames[i] ?? "") : fallbackNames;
+      const names =
+        s.names && s.names.length
+          ? s.names.map((n, i) => n ?? fallbackNames[i] ?? "שחקן")
+          : fallbackNames;
       const emojis = ["👧", "🐶", "🐻", "🎮"];
 
-      // עדכון אווטרים לכל השחקנים לפי המידע מהשרת
-      const avatars = s.avatars ?? [];
-      avatars.forEach((dataUrl, idx) => {
-        if (!dataUrl) return;
-        const key = `player-avatar-${idx}`;
-        if (!this.textures.exists(key)) {
-          this.textures.once("addtexture", (texKey: string) => {
-            if (texKey === key) {
-              this.players?.setPlayerTexture(idx, key);
-            }
-          });
-          this.textures.addBase64(key, dataUrl);
-        } else {
-          this.players?.setPlayerTexture(idx, key);
-        }
-      });
+      // עדכון אווטרים מהשרת – ב־try/catch כדי שלא לשבור תור/שמות אם התמונה נכשלת
+      try {
+        const avatars = s.avatars ?? [];
+        avatars.forEach((dataUrl, idx) => {
+          if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image")) return;
+          const key = `player-avatar-${idx}`;
+          if (!this.textures.exists(key)) {
+            this.textures.once("addtexture", (texKey: string) => {
+              if (texKey === key) this.players?.setPlayerTexture(idx, key);
+            });
+            this.textures.addBase64(key, dataUrl);
+          } else {
+            this.players?.setPlayerTexture(idx, key);
+          }
+        });
+      } catch (_) {
+        // התעלמות משגיאות טעינת תמונות
+      }
 
       const me = this.getMyIndex();
       const myIdxForUI = me ?? 0;
-
       const myName = names[myIdxForUI] ?? "שחקן";
       const myEmoji = emojis[myIdxForUI] ?? "🎮";
       this.ui.setDicePlayer(myName, myEmoji);
@@ -424,7 +428,11 @@ export default class ParallaxScene extends Phaser.Scene {
       if (me !== null) {
         this.camCtl.follow(this.players.getContainer(me));
       }
-    });
+    };
+
+    this.net.on("state", applyNetState);
+    // מיישמים מיד את המצב הנוכחי (assign/turn כבר הגיעו לפני שהסצנה עלתה)
+    applyNetState(this.net.getState());
 
     this.net.on(
       "move",

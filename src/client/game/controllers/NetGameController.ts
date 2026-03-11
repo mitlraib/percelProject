@@ -131,4 +131,16 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
     };
     this.emit("state", s);
   }
+
+  /** מחזיר את המצב הנוכחי – כדי ש־ParallaxScene יוכל ליישם אותו מיד בהצטרפות (אחרי שה־assign כבר הגיע). */
+  getState(): NetStateView {
+    return {
+      ready: this.ready,
+      myIndex: this.myIndex,
+      currentTurn: this.currentTurn,
+      canRollNow: this.canRollNowFlag,
+      names: this.names,
+      avatars: this.avatars,
+    };
+  }
 }
