@@ -127,6 +127,14 @@ export default class PlayerManager {
     return this.sprites[index];
   }
 
+  /** מחליף את הטקסטורה של שחקן (למשל תמונה שהועלתה). מעדכן סקייל לפי targetHeight. */
+  setPlayerTexture(playerIndex: number, textureKey: string) {
+    const sprite = this.sprites[playerIndex];
+    if (!sprite) return;
+    sprite.setTexture(textureKey);
+    sprite.setScale(this.targetHeight / sprite.height);
+  }
+
   getContainer(index: number) {
     return this.containers[index];
   }

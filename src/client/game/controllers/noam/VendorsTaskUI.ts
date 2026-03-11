@@ -54,7 +54,8 @@ export default class VendorsTaskUI {
     overlay.disableInteractive();
 
     const panelW = Math.min(820, Math.floor(this.scene.scale.width * 0.88));
-    const panelH = 420;
+    // גובה הפאנל מותאם למסכים קטנים כדי שלא יחתך בנייד
+    const panelH = Math.min(420, Math.floor(this.scene.scale.height * 0.9));
 
     const panelBg = this.scene.add.graphics();
     panelBg.fillStyle(0xffffff, 1);
@@ -64,17 +65,19 @@ export default class VendorsTaskUI {
 
     const title = this.scene.add
       .text(
-        -panelW / 2 + 24,
-        -panelH / 2 + 18,
-        `כתבי ${needCount} ספקים / שירותים שצריך לסגור לפני החתונה תוך דקה !`,
+        panelW / 2 - 24,
+        -panelH / 2 + 58,
+        // סימן הקריאה בתחילת המחרוזת כך שב-RTL הוא יוצג בסוף המשפט (בשמאל)
+        `! כתבי ${needCount} ספקים / שירותים שצריך לסגור לפני החתונה תוך דקה`,
         {
           fontFamily: "Arial Black",
           fontSize: "20px",
           color: "#111",
+          align: "right",
           wordWrap: { width: panelW - 140, useAdvancedWrap: true },
         }
       )
-      .setOrigin(0, 0);
+      .setOrigin(1, 0);
 
     const timer = this.scene.add
       .text(panelW / 2 - 24, -panelH / 2 + 18, "⏳ 01:00", {
@@ -87,17 +90,19 @@ export default class VendorsTaskUI {
 
     const hint = this.scene.add
       .text(
-        -panelW / 2 + 24,
-        -panelH / 2 + 80,
-        "טיפ: כתבי ספק אחד ולחצי Enter במקלדת. אפשר גם כמה יחד עם פסיקים.",
+        panelW / 2 - 24,
+        -panelH / 2 + 132,
+        // הטיפ קודם, אחריו ההסבר – סדר ברור בעברית
+        "טיפ\u200F: כתבי ספק אחד ולחצי Enter. אחר כך אפשר להזין עוד ספקים מופרדים בפסיקים.",
         {
           fontFamily: "Arial",
           fontSize: "16px",
           color: "#333",
+          align: "right",
           wordWrap: { width: panelW - 48, useAdvancedWrap: true },
         }
       )
-      .setOrigin(0, 0);
+      .setOrigin(1, 0);
 
     const inputBg = this.scene.add.graphics();
     inputBg.fillStyle(0xf3f3f3, 1);
@@ -106,39 +111,43 @@ export default class VendorsTaskUI {
     inputBg.strokeRoundedRect(-panelW / 2 + 24, -10, panelW - 48, 58, 14);
 
     const inputLabel = this.scene.add
-      .text(-panelW / 2 + 40, 4, "הקלידי כאן:", {
+      .text(panelW / 2 - 40, 4, "הקלידי כאן:", {
         fontFamily: "Arial",
         fontSize: "14px",
         color: "#555",
+        align: "right",
       })
-      .setOrigin(0, 0);
+      .setOrigin(1, 0);
 
     const inputText = this.scene.add
-      .text(-panelW / 2 + 40, 24, "", {
+      .text(panelW / 2 - 40, 24, "", {
         fontFamily: "Arial",
         fontSize: "18px",
         color: "#111",
+        align: "right",
         wordWrap: { width: panelW - 90, useAdvancedWrap: true },
       })
-      .setOrigin(0, 0);
+      .setOrigin(1, 0);
     this.inputText = inputText;
 
     const listTitle = this.scene.add
-      .text(-panelW / 2 + 24, 80, `נכנסו (0/${needCount}):`, {
+      .text(panelW / 2 - 24, 80, `נכנסו (0/${needCount}):`, {
         fontFamily: "Arial Black",
         fontSize: "16px",
         color: "#111",
+        align: "right",
       })
-      .setOrigin(0, 0);
+      .setOrigin(1, 0);
 
     const listText = this.scene.add
-      .text(-panelW / 2 + 24, 110, "", {
+      .text(panelW / 2 - 24, 110, "", {
         fontFamily: "Arial",
         fontSize: "18px",
         color: "#111",
+        align: "right",
         wordWrap: { width: panelW - 48, useAdvancedWrap: true },
       })
-      .setOrigin(0, 0);
+      .setOrigin(1, 0);
     this.listText = listText;
 
     root.add([overlay, panelBg, title, timer, hint, inputBg, inputLabel, inputText, listTitle, listText]);
@@ -195,12 +204,13 @@ export default class VendorsTaskUI {
 
     input.style.position = "fixed";
     input.style.left = "50%";
-    input.style.bottom = "24px";
-    input.style.transform = "translateX(-50%)";
-    input.style.width = "min(92vw, 700px)";
-    input.style.height = "48px";
-    input.style.padding = "0 14px";
-    input.style.fontSize = "18px";
+    // טיפ טיפה מעל מה שהיינו קודם – קצת יותר קרוב לאזור הטקסט
+    input.style.top = "55%";
+    input.style.transform = "translate(-50%, -50%)";
+    input.style.width = "min(94vw, 720px)";
+    input.style.height = "60px";
+    input.style.padding = "0 20px";
+    input.style.fontSize = "22px";
     input.style.borderRadius = "12px";
     input.style.border = "2px solid #111";
     input.style.zIndex = "999999";
@@ -216,6 +226,9 @@ export default class VendorsTaskUI {
     });
 
     input.addEventListener("keydown", (ev) => {
+      // חשוב: לא להעביר את האירוע לפייזר, כדי ש-Space וכולי יעבדו כרגיל בשדה הטקסט
+      ev.stopPropagation();
+
       if (ev.key === "Enter") {
         ev.preventDefault();
         this.submitLine(needCount);

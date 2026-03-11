@@ -71,7 +71,11 @@ export default class MenuScene extends Phaser.Scene {
       const mode: "solo" | "local" = count === 1 ? "solo" : "local";
       this.registry.set("playerCount", count);
       this.registry.set("mode", mode);
-      this.scene.start("network-scene", { mode, playerCount: count });
+      if (count > 1) {
+        this.scene.start("player-setup-scene", { mode, playerCount: count });
+      } else {
+        this.scene.start("network-scene", { mode, playerCount: count });
+      }
     };
 
     PLAYER_OPTIONS.forEach((opt, i) => {
