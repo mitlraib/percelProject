@@ -7,6 +7,8 @@ type AssignPayload = { playerIndex: number };
 type TurnPayload = { currentTurn: number };
 type MovePayload = { playerIndex: number; value: number };
 type ReadyPayload = { ok: boolean };
+type PlayerMeta = { name?: string; avatar?: string };
+type PlayersMetaPayload = { names: (string | null)[]; avatars: (string | null)[] };
 
 export class MyRoom extends Room {
   maxClients = 4;
@@ -17,6 +19,7 @@ export class MyRoom extends Room {
   private players: string[] = []; // sessionIds לפי סדר כניסה
   private currentTurn = 0;
   private ready = false;
+  private metas: PlayerMeta[] = [];
 
   onCreate() {
     // sync ← מחזיר הכל כדי שלא נפספס
@@ -75,12 +78,31 @@ export class MyRoom extends Room {
       const deltaSteps = Math.max(-10, Math.min(-1, Math.floor(raw)));
       this.broadcast("penaltyMove", { playerIndex: idx, deltaSteps });
     });
+
+    // מטא־דאטה של שחקן (שם + תמונה) – נשלח מהקליינט ומופץ לכולם
+    this.onMessage("playerMeta", (client: Client, msg: any) => {
+      const idx = this.players.indexOf(client.sessionId);
+      if (idx === -1) return;
+
+      const nameRaw = typeof msg?.name === "string" ? msg.name : undefined;
+      const avatarRaw = typeof msg?.avatar === "string" ? msg.avatar : undefined;
+
+      const name = nameRaw ? nameRaw.slice(0, 24) : undefined;
+      const avatar =
+        avatarRaw && avatarRaw.startsWith("data:image") && avatarRaw.length < 200_000
+          ? avatarRaw
+          : undefined;
+
+      this.metas[idx] = { name, avatar };
+      this.broadcastPlayersMeta();
+    });
   }
 
   onJoin(client: Client) {
     // מוסיפים אם חדש
     if (!this.players.includes(client.sessionId)) {
       this.players.push(client.sessionId);
+      this.metas.push({});
     }
 
     // assign אישי
@@ -96,6 +118,7 @@ export class MyRoom extends Room {
     const payload: PlayersPayload = { count: this.players.length, players: [...this.players] };
     this.broadcast("players", payload);
     this.broadcast("ready", { ok: this.ready } satisfies ReadyPayload);
+    this.broadcastPlayersMeta();
 
     // אם נהיינו ready עכשיו, בוחרים התחלה (0)
     if (this.ready && this.currentTurn < 0) this.currentTurn = 0;
@@ -114,6 +137,9 @@ export class MyRoom extends Room {
   onLeave(client: Client) {
     const leavingIdx = this.players.indexOf(client.sessionId);
     this.players = this.players.filter((id) => id !== client.sessionId);
+    if (leavingIdx !== -1) {
+      this.metas.splice(leavingIdx, 1);
+    }
 
     // אם אף אחד לא נשאר
     if (this.players.length === 0) {
@@ -157,5 +183,24 @@ export class MyRoom extends Room {
     if (idx >= 0) client.send("assign", { playerIndex: idx } satisfies AssignPayload);
 
     client.send("turn", { currentTurn: this.ready ? this.currentTurn : -1 } satisfies TurnPayload);
+
+    // שולחים גם מטא־דאטה (שמות + תמונות) ללקוח שנכנס
+    client.send("playersMeta", this.getPlayersMetaPayload());
+  }
+
+  private getPlayersMetaPayload(): PlayersMetaPayload {
+    const names: (string | null)[] = [];
+    const avatars: (string | null)[] = [];
+    for (let i = 0; i < this.players.length; i++) {
+      const meta = this.metas[i];
+      names.push(meta?.name ?? null);
+      avatars.push(meta?.avatar ?? null);
+    }
+    return { names, avatars };
+  }
+
+  private broadcastPlayersMeta() {
+    const payload = this.getPlayersMetaPayload();
+    this.broadcast("playersMeta", payload);
   }
 }

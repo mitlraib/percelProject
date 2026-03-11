@@ -41,8 +41,10 @@
 
         #game-container canvas {
             display: block;
-            width: 100% !important;
-            height: 100% !important;
+            /* שומרים על פרופורציות התמונה (השמש תישאר עיגול) */
+            width: 100%;
+            height: auto;
+            max-height: 100%;
         }
 
         #fullscreen-btn {

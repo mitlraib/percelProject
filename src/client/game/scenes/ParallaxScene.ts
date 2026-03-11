@@ -361,6 +361,13 @@ export default class ParallaxScene extends Phaser.Scene {
     this.room = room;
     this.net = existingNet ?? new NetGameController(room, this.playerCount);
 
+    // שולחים לשרת את השם / התמונה שבחרנו (אם קיימים)
+    const displayName = this.registry.get(REGISTRY_DISPLAY_NAME) as string | undefined;
+    const avatarDataUrl = this.registry.get(REGISTRY_AVATAR_DATA_URL) as string | undefined;
+    if (displayName || avatarDataUrl) {
+      this.net.sendPlayerMeta(displayName, avatarDataUrl);
+    }
+
     this.net.on("state", (s: NetStateView) => {
       if (!s.ready) {
         this.ui.setDicePlayer("מחכה לשחקנים…", "⏳");
@@ -373,19 +380,28 @@ export default class ParallaxScene extends Phaser.Scene {
 
       if (s.myIndex !== null && s.myIndex !== undefined) {
         this.myPlayerIndex = s.myIndex;
-        const dataUrl = this.registry.get(REGISTRY_AVATAR_DATA_URL) as string | undefined;
-        if (dataUrl && !this.textures.exists("player-custom-avatar")) {
-          this.textures.once("addtexture", (_key: string) => {
-            this.players?.setPlayerTexture(s.myIndex!, "player-custom-avatar");
-          });
-          this.textures.addBase64("player-custom-avatar", dataUrl);
-        } else if (this.textures.exists("player-custom-avatar")) {
-          this.players?.setPlayerTexture(s.myIndex!, "player-custom-avatar");
-        }
       }
 
-      const names = this.getCharNames();
+      const fallbackNames = this.getCharNames();
+      const names = s.names && s.names.length ? s.names.map((n, i) => n ?? fallbackNames[i] ?? "") : fallbackNames;
       const emojis = ["👧", "🐶", "🐻", "🎮"];
+
+      // עדכון אווטרים לכל השחקנים לפי המידע מהשרת
+      const avatars = s.avatars ?? [];
+      avatars.forEach((dataUrl, idx) => {
+        if (!dataUrl) return;
+        const key = `player-avatar-${idx}`;
+        if (!this.textures.exists(key)) {
+          this.textures.once("addtexture", (texKey: string) => {
+            if (texKey === key) {
+              this.players?.setPlayerTexture(idx, key);
+            }
+          });
+          this.textures.addBase64(key, dataUrl);
+        } else {
+          this.players?.setPlayerTexture(idx, key);
+        }
+      });
 
       const me = this.getMyIndex();
       const myIdxForUI = me ?? 0;

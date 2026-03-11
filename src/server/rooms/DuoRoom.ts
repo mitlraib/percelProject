@@ -4,6 +4,8 @@ type PlayersPayload = { count: number; players: string[] };
 type AssignPayload = { playerIndex: number };
 type TurnPayload = { currentTurn: number };
 type MovePayload = { playerIndex: number; value: number };
+type PlayerMeta = { name?: string; avatar?: string };
+type PlayersMetaPayload = { names: (string | null)[]; avatars: (string | null)[] };
 
 export class DuoRoom extends Room {
   maxClients = 2;
@@ -11,6 +13,7 @@ export class DuoRoom extends Room {
   private players: string[] = []; // sessionIds לפי סדר כניסה
   private currentTurn = 0;
   private ready = false;
+  private metas: PlayerMeta[] = [];
 
   onCreate() {
     this.onMessage("sync", (client: Client) => {
@@ -27,6 +30,24 @@ export class DuoRoom extends Room {
 
       const deltaSteps = Math.max(-10, Math.min(-1, Math.floor(raw)));
       this.broadcast("penaltyMove", { playerIndex: idx, deltaSteps });
+    });
+
+    // מטא־דאטה של שחקן (שם + תמונה) – נשלח מהקליינט ומופץ לכולם
+    this.onMessage("playerMeta", (client: Client, msg: any) => {
+      const idx = this.players.indexOf(client.sessionId);
+      if (idx === -1) return;
+
+      const nameRaw = typeof msg?.name === "string" ? msg.name : undefined;
+      const avatarRaw = typeof msg?.avatar === "string" ? msg.avatar : undefined;
+
+      const name = nameRaw ? nameRaw.slice(0, 24) : undefined;
+      const avatar =
+        avatarRaw && avatarRaw.startsWith("data:image") && avatarRaw.length < 200_000
+          ? avatarRaw
+          : undefined;
+
+      this.metas[idx] = { name, avatar };
+      this.broadcastPlayersMeta();
     });
 
     this.onMessage("roll", (client: Client, msg: any) => {
@@ -62,6 +83,7 @@ export class DuoRoom extends Room {
   onJoin(client: Client) {
     if (!this.players.includes(client.sessionId)) {
       this.players.push(client.sessionId);
+      this.metas.push({});
     }
 
     // assign אישי
@@ -74,6 +96,7 @@ export class DuoRoom extends Room {
     const payload: PlayersPayload = { count: this.players.length, players: [...this.players] };
     this.broadcast("players", payload);
     this.broadcast("ready", { ok: this.ready });
+    this.broadcastPlayersMeta();
 
     // כשנהיה ready בפעם הראשונה, נבחר התחלה (0)
     if (this.ready) {
@@ -86,7 +109,11 @@ export class DuoRoom extends Room {
   }
 
   onLeave(client: Client) {
+    const idx = this.players.indexOf(client.sessionId);
     this.players = this.players.filter((id) => id !== client.sessionId);
+    if (idx !== -1) {
+      this.metas.splice(idx, 1);
+    }
 
     this.ready = this.players.length === 2;
 
@@ -109,5 +136,24 @@ export class DuoRoom extends Room {
     if (idx >= 0) client.send("assign", { playerIndex: idx });
 
     client.send("turn", { currentTurn: this.ready ? this.currentTurn : -1 });
+
+    // שולחים גם מטא־דאטה (שמות + תמונות) ללקוח שנכנס
+    client.send("playersMeta", this.getPlayersMetaPayload());
+  }
+
+  private getPlayersMetaPayload(): PlayersMetaPayload {
+    const names: (string | null)[] = [];
+    const avatars: (string | null)[] = [];
+    for (let i = 0; i < this.players.length; i++) {
+      const meta = this.metas[i];
+      names.push(meta?.name ?? null);
+      avatars.push(meta?.avatar ?? null);
+    }
+    return { names, avatars };
+  }
+
+  private broadcastPlayersMeta() {
+    const payload = this.getPlayersMetaPayload();
+    this.broadcast("playersMeta", payload);
   }
 }

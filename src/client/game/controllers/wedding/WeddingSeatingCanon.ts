@@ -1,5 +1,3 @@
-// src/client/game/controllers/wedding/WeddingSeatingCanon.ts
-
 export type GuestGroup = "family" | "friends" | "other";
 
 export type GuestDef = {
@@ -22,14 +20,7 @@ export type TogetherRule = {
   reason: string;
 };
 
-export type GroupRule = {
-  type: "groupTogether";
-  group: GuestGroup;
-  minPerTable: number;
-  reason: string;
-};
-
-export type SeatingRule = ConflictRule | TogetherRule | GroupRule;
+export type SeatingRule = ConflictRule | TogetherRule;
 
 export type TableState = {
   tableId: number;
@@ -65,25 +56,13 @@ export default class WeddingSeatingCanon {
         type: "notTogether",
         a: "aunt-rachel",
         b: "uncle-moshe",
-        reason: "דודה רחל ודוד משה לא יכולים לשבת באותו שולחן",
+        reason: "❌ דודה רחל ודוד משה לא יכולים לשבת באותו שולחן",
       },
       {
         type: "mustTogether",
         a: "yossi",
         b: "noa",
-        reason: "יוסי ונועה חייבים לשבת יחד",
-      },
-      {
-        type: "groupTogether",
-        group: "family",
-        minPerTable: 2,
-        reason: "בני משפחה צריכים לשבת לפחות בזוגות",
-      },
-      {
-        type: "groupTogether",
-        group: "friends",
-        minPerTable: 2,
-        reason: "חברים צריכים לשבת לפחות בזוגות",
+        reason: "❌ יוסי ונועה חייבים לשבת יחד",
       },
     ];
   }
@@ -100,12 +79,14 @@ export default class WeddingSeatingCanon {
   }
 
   validate(tables: TableState[]): SeatingValidationResult {
-    const placedGuestIds = tables.flatMap((t) => t.seatGuestIds).filter(Boolean) as string[];
+    const placedGuestIds = tables
+      .flatMap((t) => t.seatGuestIds)
+      .filter(Boolean) as string[];
 
     if (placedGuestIds.length !== this.guests.length) {
       return {
         ok: false,
-        message: "עדיין לא כל האורחים יושבו",
+        message: "❌ עדיין לא כל האורחים יושבו",
       };
     }
 
@@ -113,7 +94,7 @@ export default class WeddingSeatingCanon {
     if (unique.size !== this.guests.length) {
       return {
         ok: false,
-        message: "אותו אורח שובץ יותר מפעם אחת",
+        message: "❌ אותו אורח שובץ יותר מפעם אחת",
       };
     }
 
@@ -122,6 +103,7 @@ export default class WeddingSeatingCanon {
         for (const table of tables) {
           const hasA = table.seatGuestIds.includes(rule.a);
           const hasB = table.seatGuestIds.includes(rule.b);
+
           if (hasA && hasB) {
             return {
               ok: false,
@@ -147,35 +129,11 @@ export default class WeddingSeatingCanon {
           };
         }
       }
-
-      if (rule.type === "groupTogether") {
-        for (const table of tables) {
-          const groupGuests = table.seatGuestIds
-            .filter(Boolean)
-            .map((id) => this.getGuestById(id as string))
-            .filter(Boolean)
-            .filter((g) => g!.group === rule.group);
-
-          if (groupGuests.length === 1) {
-            return {
-              ok: false,
-              message: rule.reason,
-            };
-          }
-
-          if (groupGuests.length > 0 && groupGuests.length < rule.minPerTable) {
-            return {
-              ok: false,
-              message: rule.reason,
-            };
-          }
-        }
-      }
     }
 
     return {
       ok: true,
-      message: "מעולה! כולם יושבים בלי ריבים משפחתיים",
+      message: "✅ מעולה! סידרת את האורחים נכון",
     };
   }
 }

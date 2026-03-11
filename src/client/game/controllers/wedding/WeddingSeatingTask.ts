@@ -64,14 +64,10 @@ export default class WeddingSeatingTask {
     dropZone: Phaser.GameObjects.GameObject
   ) => void;
 
-  // intro של אבא
-  private introRoot?: Phaser.GameObjects.Container;
   private introBackdrop?: Phaser.GameObjects.Rectangle;
-  private introPanel?: Phaser.GameObjects.Rectangle;
   private introDad?: Phaser.GameObjects.Image;
-  private introTitle?: Phaser.GameObjects.Text;
-  private introText?: Phaser.GameObjects.Text;
-  private introStartBtn?: Phaser.GameObjects.Container;
+  private introBubble?: Phaser.GameObjects.Container;
+  private introTimer?: Phaser.Time.TimerEvent;
 
   constructor(scene: Phaser.Scene, opts: WeddingSeatingTaskOpts = {}) {
     this.scene = scene;
@@ -80,167 +76,124 @@ export default class WeddingSeatingTask {
   }
 
   open() {
-    this.openIntro();
+    this.openDadIntro();
   }
 
-  private openIntro() {
+  private openDadIntro() {
     const depth = this.opts.depth ?? 5000;
     const { width, height } = this.scene.scale;
 
     this.introBackdrop = this.scene.add
-      .rectangle(0, 0, width, height, 0x000000, 0.55)
+      .rectangle(0, 0, width, height, 0x000000, 0.3)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(depth);
 
-    this.introPanel = this.scene.add
-      .rectangle(
-        width / 2,
-        height / 2,
-        Math.min(980, width * 0.9),
-        Math.min(620, height * 0.86),
-        0xfaf2e8,
-        1
-      )
-      .setStrokeStyle(4, 0x4b2e2e)
-      .setScrollFactor(0)
-      .setDepth(depth + 1);
-
-    const dadKey =
-      this.scene.textures.exists("DAD")
-        ? "DAD"
-        : this.scene.textures.exists("dad")
-        ? "dad"
-        : null;
-
-    const introChildren: Phaser.GameObjects.GameObject[] = [];
+    const dadKey = this.scene.textures.exists("DAD")
+      ? "DAD"
+      : this.scene.textures.exists("dad")
+      ? "dad"
+      : null;
 
     if (dadKey) {
       this.introDad = this.scene.add
-        .image(width / 2, height / 2 - 70, dadKey)
+        .image(width * 0.22, height * 0.64, dadKey)
         .setScrollFactor(0)
         .setDepth(depth + 2);
 
       const tex = this.introDad.texture.getSourceImage() as HTMLImageElement;
       const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
-      const targetH = Math.min(220, height * 0.28);
+      const targetH = Math.min(180, height * 0.24);
       this.introDad.setDisplaySize(targetH * ratio, targetH);
-
-      introChildren.push(this.introDad);
     }
 
-    this.introTitle = this.scene.add
-      .text(width / 2, height / 2 + 85, "אבא", {
-        fontFamily: "Arial",
-        fontSize: "34px",
-        color: "#3a1f1f",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(depth + 2);
+    this.introBubble = this.createSpeechBubble(
+      width * 0.5,
+      height * 0.45,
+      Math.min(520, width * 0.48),
+      96,
+      "אוי! תכף החתונה ויש כזה בלאגן בשולחנות.\nתוכלי לעזור לי לסדר את האורחים בשולחנות?",
+      depth + 3
+    );
 
-    this.introText = this.scene.add
-      .text(
-        width / 2,
-        height / 2 + 145,
-        "אוי! תכף החתונה ויש כזה בלאגן בשולחנות.\nתוכלי לעזור לי לסדר את האורחים בשולחנות?",
-        {
-          fontFamily: "Arial",
-          fontSize: "28px",
-          color: "#4a3a3a",
-          align: "center",
-          wordWrap: { width: Math.min(760, width * 0.72) },
-          rtl: true,
-        }
-      )
-      .setOrigin(0.5, 0)
-      .setScrollFactor(0)
-      .setDepth(depth + 2);
+    const introTargets: Phaser.GameObjects.GameObject[] = [];
+    if (this.introBackdrop) introTargets.push(this.introBackdrop);
+    if (this.introDad) introTargets.push(this.introDad);
+    if (this.introBubble) introTargets.push(this.introBubble);
 
-    this.introStartBtn = this.createIntroButton(
-      width / 2,
-      height / 2 + this.introPanel.height / 2 - 55,
-      220,
-      60,
-      "יאללה, מתחילים",
-      0x6dbb75,
-      () => this.startTaskFromIntro()
-    ).setDepth(depth + 3);
-
-    this.introRoot = this.scene.add
-      .container(0, 0, [
-        this.introPanel,
-        ...introChildren,
-        this.introTitle,
-        this.introText,
-        this.introStartBtn,
-      ])
-      .setScrollFactor(0)
-      .setDepth(depth + 1);
+    for (const target of introTargets) {
+      (target as any).setAlpha(0);
+    }
 
     this.scene.tweens.add({
-      targets: [this.introBackdrop, this.introRoot],
-      alpha: { from: 0, to: 1 },
+      targets: introTargets,
+      alpha: 1,
       duration: 180,
-      ease: "Quad.easeOut",
+      ease: "Sine.easeOut",
+    });
+
+    this.introTimer = this.scene.time.delayedCall(2000, () => {
+      this.hideDadIntroAndStartTask();
     });
   }
 
-  private createIntroButton(
+  private createSpeechBubble(
     x: number,
     y: number,
     w: number,
     h: number,
     text: string,
-    color: number,
-    onClick: () => void
-  ) {
+    depth: number
+  ): Phaser.GameObjects.Container {
     const bg = this.scene.add
-      .rectangle(0, 0, w, h, color, 1)
-      .setStrokeStyle(3, 0x3a2a2a)
-      .setInteractive({ useHandCursor: true });
+      .rectangle(0, 0, w, h, 0xffffff, 0.98)
+      .setStrokeStyle(3, 0x4b2e2e);
+
+    const tail = this.scene.add
+      .triangle(-(w / 2) + 28, h / 2 - 4, 0, 0, 18, 0, 5, 16, 0xffffff, 0.98)
+      .setStrokeStyle(2, 0x4b2e2e);
 
     const label = this.scene.add
       .text(0, 0, text, {
         fontFamily: "Arial",
-        fontSize: "26px",
-        color: "#ffffff",
-        fontStyle: "bold",
+        fontSize: "18px",
+        color: "#3a1f1f",
+        align: "center",
+        wordWrap: { width: w - 30 },
+        rtl: true,
       })
       .setOrigin(0.5);
 
-    const c = this.scene.add.container(x, y, [bg, label]).setScrollFactor(0);
-
-    bg.on("pointerover", () => c.setScale(1.04));
-    bg.on("pointerout", () => c.setScale(1));
-    bg.on("pointerdown", onClick);
-
-    return c;
+    return this.scene.add
+      .container(x, y, [bg, tail, label])
+      .setScrollFactor(0)
+      .setDepth(depth);
   }
 
-  private startTaskFromIntro() {
-    if (!this.introRoot || !this.introBackdrop) {
+  private hideDadIntroAndStartTask() {
+    const targets: Phaser.GameObjects.GameObject[] = [];
+    if (this.introBackdrop) targets.push(this.introBackdrop);
+    if (this.introDad) targets.push(this.introDad);
+    if (this.introBubble) targets.push(this.introBubble);
+
+    if (targets.length === 0) {
       this.buildTaskUI();
       return;
     }
 
     this.scene.tweens.add({
-      targets: [this.introBackdrop, this.introRoot],
+      targets,
       alpha: 0,
       duration: 180,
-      ease: "Quad.easeIn",
+      ease: "Sine.easeIn",
       onComplete: () => {
-        this.introRoot?.destroy(true);
         this.introBackdrop?.destroy();
+        this.introDad?.destroy();
+        this.introBubble?.destroy();
 
-        this.introRoot = undefined;
         this.introBackdrop = undefined;
-        this.introPanel = undefined;
         this.introDad = undefined;
-        this.introTitle = undefined;
-        this.introText = undefined;
-        this.introStartBtn = undefined;
+        this.introBubble = undefined;
 
         this.buildTaskUI();
       },
@@ -260,7 +213,7 @@ export default class WeddingSeatingTask {
     const { width, height } = this.scene.scale;
 
     this.backdrop = this.scene.add
-      .rectangle(0, 0, width, height, 0x000000, 0.55)
+      .rectangle(0, 0, width, height, 0x000000, 0.5)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(depth);
@@ -268,9 +221,9 @@ export default class WeddingSeatingTask {
     this.panel = this.scene.add
       .rectangle(
         width / 2,
-        height / 2,
-        Math.min(1120, width * 0.92),
-        Math.min(720, height * 0.9),
+        height / 2 - 20,
+        Math.min(920, width * 0.86),
+        Math.min(560, height * 0.8),
         0xfaf2e8,
         1
       )
@@ -278,10 +231,12 @@ export default class WeddingSeatingTask {
       .setScrollFactor(0)
       .setDepth(depth + 1);
 
+    const panelTop = this.panel.y - this.panel.height / 2;
+
     this.titleText = this.scene.add
-      .text(width / 2, height / 2 - this.panel.height / 2 + 28, "סידור שולחנות", {
+      .text(width / 2, panelTop + 18, "סידור שולחנות", {
         fontFamily: "Arial",
-        fontSize: "34px",
+        fontSize: "24px",
         color: "#3a1f1f",
         fontStyle: "bold",
       })
@@ -290,12 +245,12 @@ export default class WeddingSeatingTask {
       .setDepth(depth + 2);
 
     this.rulesText = this.scene.add
-      .text(width / 2, this.titleText.y + 52, this.buildRulesText(), {
+      .text(width / 2, panelTop + 60, this.buildRulesText(), {
         fontFamily: "Arial",
-        fontSize: "18px",
+        fontSize: "13px",
         color: "#4a3a3a",
         align: "right",
-        wordWrap: { width: Math.min(960, width * 0.82) },
+        wordWrap: { width: Math.min(700, width * 0.62) },
         rtl: true,
       })
       .setOrigin(0.5, 0)
@@ -303,9 +258,9 @@ export default class WeddingSeatingTask {
       .setDepth(depth + 2);
 
     this.timerText = this.scene.add
-      .text(width / 2 - 440, this.titleText.y + 8, `זמן: ${this.remainingSec}`, {
+      .text(width / 2 - 315, panelTop + 14, `זמן: ${this.remainingSec}`, {
         fontFamily: "Arial",
-        fontSize: "24px",
+        fontSize: "18px",
         color: "#8b1e3f",
         fontStyle: "bold",
       })
@@ -314,13 +269,13 @@ export default class WeddingSeatingTask {
       .setDepth(depth + 2);
 
     this.statusText = this.scene.add
-      .text(width / 2, this.panel.y + this.panel.height / 2 - 95, "גררי את האורחים לשולחנות", {
+      .text(width / 2, panelTop + 350, "גררי את האורחים לשולחנות", {
         fontFamily: "Arial",
-        fontSize: "22px",
+        fontSize: "16px",
         color: "#2d4a22",
         fontStyle: "bold",
       })
-      .setOrigin(0.5, 0.5)
+      .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(depth + 2);
 
@@ -329,7 +284,7 @@ export default class WeddingSeatingTask {
 
     this.createTables(depth + 2);
     this.createGuestCards(depth + 3);
-    this.createButtons(depth + 3);
+    this.createButtons(depth + 10);
     this.registerDropHandler();
 
     this.timerEvent = this.scene.time.addEvent({
@@ -350,6 +305,7 @@ export default class WeddingSeatingTask {
 
   destroy() {
     this.timerEvent?.remove(false);
+    this.introTimer?.remove(false);
     this.destroyInputHandlers();
 
     this.root?.destroy(true);
@@ -360,8 +316,9 @@ export default class WeddingSeatingTask {
     this.timerText?.destroy();
     this.statusText?.destroy();
 
-    this.introRoot?.destroy(true);
     this.introBackdrop?.destroy();
+    this.introDad?.destroy();
+    this.introBubble?.destroy();
 
     this.seats = [];
     this.guestCards = [];
@@ -372,32 +329,29 @@ export default class WeddingSeatingTask {
       "חוקים:",
       "1. דודה רחל ודוד משה לא יכולים לשבת באותו שולחן",
       "2. יוסי ונועה חייבים לשבת יחד",
-      "3. משפחה יושבת לפחות בזוגות",
-      "4. חברים יושבים לפחות בזוגות",
     ].join("\n");
   }
 
   private createTables(depth: number) {
-    const { width, height } = this.scene.scale;
+    const { width } = this.scene.scale;
 
-    const areaTop = height / 2 - 40;
-    const tableY = areaTop + 60;
-    const tableGap = 300;
+    const tableY = this.panel.y - 35;
+    const tableGap = 220;
     const tableStartX = width / 2 - tableGap / 2;
 
     for (let t = 0; t < this.canon.tablesCount; t++) {
       const tableX = tableStartX + t * tableGap;
 
       const tableCircle = this.scene.add
-        .ellipse(tableX, tableY, 220, 150, 0xe5d3b3, 1)
-        .setStrokeStyle(4, 0x6a4e32)
+        .ellipse(tableX, tableY, 150, 102, 0xe5d3b3, 1)
+        .setStrokeStyle(3, 0x6a4e32)
         .setScrollFactor(0)
         .setDepth(depth);
 
       const tableLabel = this.scene.add
-        .text(tableX, tableY - 95, `שולחן ${t + 1}`, {
+        .text(tableX, tableY - 62, `שולחן ${t + 1}`, {
           fontFamily: "Arial",
-          fontSize: "24px",
+          fontSize: "18px",
           color: "#3d2b1f",
           fontStyle: "bold",
         })
@@ -408,23 +362,23 @@ export default class WeddingSeatingTask {
       this.root.add([tableCircle, tableLabel]);
 
       const seatPositions = [
-        { x: tableX - 80, y: tableY - 25 },
-        { x: tableX + 0, y: tableY - 40 },
-        { x: tableX + 80, y: tableY - 25 },
+        { x: tableX - 52, y: tableY - 14 },
+        { x: tableX, y: tableY - 24 },
+        { x: tableX + 52, y: tableY - 14 },
       ];
 
       for (let s = 0; s < this.canon.seatsPerTable; s++) {
         const pos = seatPositions[s];
 
         const bg = this.scene.add
-          .rectangle(pos.x, pos.y, 110, 54, 0xffffff, 0.95)
-          .setStrokeStyle(3, 0x8b7355)
+          .rectangle(pos.x, pos.y, 76, 36, 0xffffff, 0.96)
+          .setStrokeStyle(2, 0x8b7355)
           .setScrollFactor(0)
           .setDepth(depth + 1);
 
         const zone = this.scene.add
-          .zone(pos.x, pos.y, 110, 54)
-          .setRectangleDropZone(110, 54)
+          .zone(pos.x, pos.y, 92, 52)
+          .setRectangleDropZone(92, 52)
           .setScrollFactor(0)
           .setDepth(depth + 2);
 
@@ -435,8 +389,8 @@ export default class WeddingSeatingTask {
           seatIndex: s,
           x: pos.x,
           y: pos.y,
-          w: 110,
-          h: 54,
+          w: 92,
+          h: 52,
           zone,
           bg,
         });
@@ -444,9 +398,9 @@ export default class WeddingSeatingTask {
     }
 
     const guestBankTitle = this.scene.add
-      .text(width / 2, height / 2 + 165, "אורחים", {
+      .text(this.panel.x, this.panel.y + 140, "אורחים", {
         fontFamily: "Arial",
-        fontSize: "24px",
+        fontSize: "18px",
         color: "#3d2b1f",
         fontStyle: "bold",
       })
@@ -458,14 +412,17 @@ export default class WeddingSeatingTask {
   }
 
   private createGuestCards(depth: number) {
-    const { width, height } = this.scene.scale;
-
     const guests = this.canon.guests;
     const cols = 3;
-    const gapX = 210;
-    const gapY = 78;
-    const startX = width / 2 - gapX;
-    const startY = height / 2 + 230;
+    const gapX = 170;
+    const gapY = 58;
+    const cardW = 112;
+    const cardH = 36;
+    const hitW = 144;
+    const hitH = 52;
+
+    const startX = this.panel.x - gapX;
+    const startY = this.panel.y + 178;
 
     guests.forEach((guest, index) => {
       const row = Math.floor(index / cols);
@@ -482,16 +439,13 @@ export default class WeddingSeatingTask {
           : 0xf0f0f0;
 
       const bg = this.scene.add
-        .rectangle(0, 0, 150, 52, bgColor, 1)
-        .setStrokeStyle(3, 0x4b2e2e)
-        .setInteractive({ useHandCursor: true });
-
-      this.scene.input.setDraggable(bg);
+        .rectangle(0, 0, cardW, cardH, bgColor, 1)
+        .setStrokeStyle(2, 0x4b2e2e);
 
       const label = this.scene.add
         .text(0, 0, guest.label, {
           fontFamily: "Arial",
-          fontSize: "20px",
+          fontSize: "14px",
           color: "#2d2d2d",
           fontStyle: "bold",
           rtl: true,
@@ -501,7 +455,14 @@ export default class WeddingSeatingTask {
       const container = this.scene.add
         .container(x, y, [bg, label])
         .setScrollFactor(0)
-        .setDepth(depth);
+        .setDepth(depth)
+        .setSize(hitW, hitH)
+        .setInteractive(
+          new Phaser.Geom.Rectangle(-hitW / 2, -hitH / 2, hitW, hitH),
+          Phaser.Geom.Rectangle.Contains
+        );
+
+      this.scene.input.setDraggable(container);
 
       const card: GuestCardView = {
         guest,
@@ -520,26 +481,26 @@ export default class WeddingSeatingTask {
   }
 
   private setupGuestDrag(card: GuestCardView) {
-    const inputBg = card.bg;
+    const dragTarget = card.container;
 
-    inputBg.on("dragstart", () => {
+    dragTarget.on("dragstart", () => {
       if (this.finished) return;
 
-      card.container.setScale(1.08);
-      card.container.setDepth(999999);
+      dragTarget.setScale(1.08);
+      dragTarget.setDepth(999999);
       this.highlightAllSeats(true);
     });
 
-    inputBg.on("drag", (_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
+    dragTarget.on("drag", (_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
       if (this.finished) return;
-      card.container.x = dragX;
-      card.container.y = dragY;
+      dragTarget.x = dragX;
+      dragTarget.y = dragY;
     });
 
-    inputBg.on("dragend", (_pointer: Phaser.Input.Pointer, dropped: boolean) => {
+    dragTarget.on("dragend", (_pointer: Phaser.Input.Pointer, dropped: boolean) => {
       if (this.finished) return;
 
-      card.container.setScale(1);
+      dragTarget.setScale(1);
       this.highlightAllSeats(false);
 
       if (!dropped) {
@@ -556,7 +517,7 @@ export default class WeddingSeatingTask {
     ) => {
       if (this.finished) return;
 
-      const card = this.guestCards.find((c) => c.bg === gameObject);
+      const card = this.guestCards.find((c) => c.container === gameObject);
       if (!card) return;
 
       const seat = this.seats.find((s) => s.zone === dropZone);
@@ -582,8 +543,8 @@ export default class WeddingSeatingTask {
     const seat = this.tables[tableId].seatGuestIds[seatIndex];
 
     if (seat && seat !== card.guest.id) {
-      this.statusText.setColor("#8b1e3f");
-      this.statusText.setText("המקום הזה כבר תפוס");
+      this.statusText.setColor("#b00020");
+      this.statusText.setText("❌ המקום הזה כבר תפוס");
       this.moveCardToSeatOrHome(card);
       return;
     }
@@ -611,8 +572,8 @@ export default class WeddingSeatingTask {
     );
 
     if (!seatView) {
-      this.statusText.setColor("#8b1e3f");
-      this.statusText.setText("לא נמצא מושב מתאים");
+      this.statusText.setColor("#b00020");
+      this.statusText.setText("❌ לא נמצא מושב מתאים");
       this.moveCardToSeatOrHome(card);
       return;
     }
@@ -657,36 +618,35 @@ export default class WeddingSeatingTask {
       targets: card.container,
       x,
       y,
-      duration: 180,
+      duration: 170,
       ease: "Quad.easeOut",
     });
   }
 
   private highlightAllSeats(active: boolean) {
     for (const seat of this.seats) {
-      seat.bg.setFillStyle(active ? 0xfff7cc : 0xffffff, 0.95);
+      seat.bg.setFillStyle(active ? 0xfff7cc : 0xffffff, 0.96);
     }
   }
 
   private createButtons(depth: number) {
-    const { width, height } = this.scene.scale;
-    const buttonY = height / 2 + this.panel.height / 2 - 20;
+    const buttonY = this.panel.y + this.panel.height / 2 - 32;
 
     this.submitBtn = this.createButton(
-      width / 2 + 120,
+      this.panel.x + 85,
       buttonY,
-      180,
-      54,
+      128,
+      40,
       "בדיקה",
       0x6dbb75,
       () => this.submit()
     ).setDepth(depth);
 
     this.closeBtn = this.createButton(
-      width / 2 - 120,
+      this.panel.x - 85,
       buttonY,
-      180,
-      54,
+      128,
+      40,
       "סגור",
       0xd97b7b,
       () => this.finish({ ok: false, reason: "closed" })
@@ -706,23 +666,33 @@ export default class WeddingSeatingTask {
   ): Phaser.GameObjects.Container {
     const bg = this.scene.add
       .rectangle(0, 0, w, h, color, 1)
-      .setStrokeStyle(3, 0x3a2a2a)
-      .setInteractive({ useHandCursor: true });
+      .setStrokeStyle(2, 0x3a2a2a)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(30000);
 
     const label = this.scene.add
       .text(0, 0, text, {
         fontFamily: "Arial",
-        fontSize: "24px",
+        fontSize: "18px",
         color: "#ffffff",
         fontStyle: "bold",
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(30001);
 
-    const c = this.scene.add.container(x, y, [bg, label]).setScrollFactor(0);
+    const c = this.scene.add
+      .container(x, y, [bg, label])
+      .setScrollFactor(0)
+      .setDepth(30000)
+      .setSize(w, h)
+      .setInteractive(
+        new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h),
+        Phaser.Geom.Rectangle.Contains
+      );
 
-    bg.on("pointerover", () => c.setScale(1.04));
-    bg.on("pointerout", () => c.setScale(1));
-    bg.on("pointerdown", () => {
+    c.on("pointerover", () => c.setScale(1.04));
+    c.on("pointerout", () => c.setScale(1));
+    c.on("pointerup", () => {
       if (!this.finished) onClick();
     });
 
@@ -732,18 +702,42 @@ export default class WeddingSeatingTask {
   private submit() {
     if (this.finished) return;
 
+    console.log("SUBMIT CLICKED");
+    console.log("TABLES:", JSON.stringify(this.tables, null, 2));
+
     const result = this.canon.validate(this.tables);
+    console.log("VALIDATION RESULT:", result);
 
     if (!result.ok) {
-      this.statusText.setColor("#8b1e3f");
+      this.statusText.setColor("#b00020");
       this.statusText.setText(result.message);
+
+      this.scene.tweens.add({
+        targets: this.statusText,
+        scaleX: 1.05,
+        scaleY: 1.05,
+        duration: 90,
+        yoyo: true,
+        repeat: 1,
+        ease: "Sine.easeInOut",
+      });
+
+      this.scene.tweens.add({
+        targets: this.panel,
+        x: this.panel.x + 6,
+        duration: 45,
+        yoyo: true,
+        repeat: 3,
+        ease: "Sine.easeInOut",
+      });
+
       return;
     }
 
     this.statusText.setColor("#1f6f3f");
     this.statusText.setText(result.message);
 
-    this.scene.time.delayedCall(700, () => {
+    this.scene.time.delayedCall(600, () => {
       this.finish({ ok: true });
     });
   }
@@ -753,20 +747,23 @@ export default class WeddingSeatingTask {
     this.finished = true;
 
     this.timerEvent?.remove(false);
+    this.introTimer?.remove(false);
     this.destroyInputHandlers();
 
+    const targets: Phaser.GameObjects.GameObject[] = [
+      this.backdrop,
+      this.panel,
+      this.titleText,
+      this.rulesText,
+      this.timerText,
+      this.statusText,
+      this.root,
+    ].filter(Boolean) as Phaser.GameObjects.GameObject[];
+
     this.scene.tweens.add({
-      targets: [
-        this.backdrop,
-        this.panel,
-        this.titleText,
-        this.rulesText,
-        this.timerText,
-        this.statusText,
-        this.root,
-      ],
+      targets,
       alpha: 0,
-      duration: 220,
+      duration: 200,
       ease: "Quad.easeIn",
       onComplete: () => {
         this.destroy();

@@ -7,6 +7,8 @@ export type NetStateView = {
   myIndex: number | null;
   currentTurn: number;
   canRollNow: boolean;
+  names?: (string | null)[];
+  avatars?: (string | null)[];
 };
 
 type PlayersPayload = { count: number; players: string[] };
@@ -16,6 +18,7 @@ type TurnPayload = { currentTurn: number };
 type MovePayload = { playerIndex: number; value: number };
 type PenaltyMovePayload = { playerIndex: number; deltaSteps: number };
 type RollDeniedPayload = { reason?: string; currentTurn?: number };
+type PlayersMetaPayload = { names?: (string | null)[]; avatars?: (string | null)[] };
 
 export default class NetGameController extends Phaser.Events.EventEmitter {
   private room: Room;
@@ -28,6 +31,8 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
   private currentTurn = -1;
 
   private canRollNowFlag = false;
+  private names: (string | null)[] = [];
+  private avatars: (string | null)[] = [];
 
   constructor(room: Room, playerCount: number) {
     super();
@@ -66,6 +71,12 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
       this.emit("penaltyMove", p);
     });
 
+    room.onMessage("playersMeta", (p: PlayersMetaPayload) => {
+      this.names = p.names ?? [];
+      this.avatars = p.avatars ?? [];
+      this.emitState();
+    });
+
     room.onMessage("rollDenied", (p: RollDeniedPayload) => {
       if (Number.isFinite(p.currentTurn)) {
         this.currentTurn = p.currentTurn as number;
@@ -97,6 +108,10 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
     this.room.send("penalty", { deltaSteps, playerIndex: this.myIndex });
   }
 
+  sendPlayerMeta(name?: string, avatar?: string) {
+    this.room.send("playerMeta", { name, avatar });
+  }
+
   private recomputeCanRoll() {
     this.canRollNowFlag =
       this.ready &&
@@ -111,6 +126,8 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
       myIndex: this.myIndex,
       currentTurn: this.currentTurn,
       canRollNow: this.canRollNowFlag,
+      names: this.names,
+      avatars: this.avatars,
     };
     this.emit("state", s);
   }
