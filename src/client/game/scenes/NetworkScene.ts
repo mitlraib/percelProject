@@ -66,7 +66,9 @@ export default class NetworkScene extends Phaser.Scene {
       return;
     }
 
-    const roomName = this.playerCount === 2 ? "duo_room" : "my_room";
+    // כל המצבים המרובי־שחקנים נכנסים לאותו סוג חדר ("my_room").
+    // השרת אחראי ל-ready לפי מספר השחקנים בפועל.
+    const roomName = "my_room";
     const wsUrl = getColyseusWsUrl();
     console.log("joining room ←", roomName, wsUrl);
 

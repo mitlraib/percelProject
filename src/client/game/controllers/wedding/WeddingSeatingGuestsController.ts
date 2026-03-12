@@ -31,19 +31,23 @@ export default class WeddingSeatingGuestsController {
 
   build(panel: Phaser.GameObjects.Rectangle) {
     const guests = this.canon.guests;
-    const cardW = 112;
-    const cardH = 36;
-    const hitW = 118;
-    const hitH = 42;
 
-    const leftX = panel.x - 300;
-    const rightX = panel.x + 300;
-    const startY = panel.y - 35;
-    const gapY = 74;
+    const cardW = 96;
+    const cardH = 30;
+    const hitW = 104;
+    const hitH = 36;
+
+    const perSide = Math.ceil(guests.length / 2);
+
+    const leftX = panel.x - panel.width / 2 + 90;
+    const rightX = panel.x + panel.width / 2 - 90;
+
+    const startY = panel.y - 115;
+    const gapY = 52;
 
     guests.forEach((guest, index) => {
-      const isLeft = index < 3;
-      const sideIndex = isLeft ? index : index - 3;
+      const isLeft = index < perSide;
+      const sideIndex = isLeft ? index : index - perSide;
 
       const x = isLeft ? leftX : rightX;
       const y = startY + sideIndex * gapY;
@@ -62,7 +66,7 @@ export default class WeddingSeatingGuestsController {
       const label = this.scene.add
         .text(0, 0, guest.label, {
           fontFamily: "Arial",
-          fontSize: "14px",
+          fontSize: "12px",
           color: "#2d2d2d",
           fontStyle: "bold",
           rtl: true,

@@ -5,6 +5,8 @@ import CleanupPuzzle from "../ui/CleanupPuzzle";
 type TaskManagerOpts = {
   taskSteps?: number[]; // default [3,10]
   onLockChange?: (locked: boolean) => void;
+  /** נקרא כשמשימת אמא נפתחת אצל השחקן המקומי (לשליחה לרשת) */
+  onTaskOpened?: (playerIndex: number, type: "mom") => void;
 
   isBotPlayerIndex: (playerIndex: number) => boolean;
   isLocalPlayerIndex: (playerIndex: number) => boolean;
@@ -82,6 +84,8 @@ export default class TaskManager {
     this.mom.markShown(playerIndex, step);
 
     this.lockInternal();
+
+    this.opts.onTaskOpened?.(playerIndex, "mom");
 
     const { x, y } = this.opts.getStepWorldXY(step);
 

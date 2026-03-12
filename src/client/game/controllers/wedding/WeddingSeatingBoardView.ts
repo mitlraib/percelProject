@@ -32,9 +32,9 @@ export default class WeddingSeatingBoardView {
     const panel = this.scene.add
       .rectangle(
         width / 2,
-        height / 2 - 10,
-        Math.min(980, width * 0.88),
-        Math.min(620, height * 0.86),
+        height / 2 - 6,
+        Math.min(1040, width * 0.92),
+        Math.min(660, height * 0.9),
         0xfaf2e8,
         1
       )
@@ -45,9 +45,9 @@ export default class WeddingSeatingBoardView {
     const panelTop = panel.y - panel.height / 2;
 
     const titleText = this.scene.add
-      .text(width / 2, panelTop + 18, "סידור שולחנות", {
+      .text(width / 2, panelTop + 16, "סידור שולחנות", {
         fontFamily: "Arial",
-        fontSize: "24px",
+        fontSize: "22px",
         color: "#3a1f1f",
         fontStyle: "bold",
       })
@@ -56,12 +56,12 @@ export default class WeddingSeatingBoardView {
       .setDepth(this.depth + 2);
 
     const rulesText = this.scene.add
-      .text(width / 2, panelTop + 64, this.buildRulesText(), {
+      .text(width / 2, panelTop + 52, this.buildRulesText(), {
         fontFamily: "Arial",
-        fontSize: "14px",
+        fontSize: "12px",
         color: "#4a3a3a",
         align: "center",
-        wordWrap: { width: Math.min(760, width * 0.7) },
+        wordWrap: { width: Math.min(760, panel.width * 0.74) },
         rtl: true,
       })
       .setOrigin(0.5, 0)
@@ -69,9 +69,9 @@ export default class WeddingSeatingBoardView {
       .setDepth(this.depth + 2);
 
     const timerText = this.scene.add
-      .text(width * 0.12, panelTop + 14, `זמן: ${this.durationSec}`, {
+      .text(panel.x - panel.width / 2 + 22, panelTop + 14, `זמן: ${this.durationSec}`, {
         fontFamily: "Arial",
-        fontSize: "18px",
+        fontSize: "16px",
         color: "#8b1e3f",
         fontStyle: "bold",
       })
@@ -80,9 +80,9 @@ export default class WeddingSeatingBoardView {
       .setDepth(this.depth + 2);
 
     const statusText = this.scene.add
-      .text(width / 2, panel.y + panel.height / 2 - 78, "גררי את האורחים לשולחנות", {
+      .text(width / 2, panel.y + panel.height / 2 - 72, "גררי את האורחים לשולחנות", {
         fontFamily: "Arial",
-        fontSize: "16px",
+        fontSize: "15px",
         color: "#2d4a22",
         fontStyle: "bold",
         align: "center",
@@ -113,11 +113,8 @@ export default class WeddingSeatingBoardView {
   }
 
   private buildRulesText(): string {
-    return [
-      "חוקים:",
-      "1. דודה רחל ודוד משה לא יכולים לשבת באותו שולחן",
-      "2. יוסי ונועה חייבים לשבת יחד",
-    ].join("\n");
+    const lines = this.canon.rules.map((rule, index) => `${index + 1}. ${rule.reason.replace("❌ ", "")}`);
+    return ["חוקים:", ...lines].join("\n");
   }
 
   private createTables(
@@ -125,26 +122,37 @@ export default class WeddingSeatingBoardView {
     panel: Phaser.GameObjects.Rectangle,
     depth: number
   ): SeatView[] {
-    const { width } = this.scene.scale;
     const seats: SeatView[] = [];
 
-    const tableY = panel.y + 20;
-    const tableGap = 240;
-    const tableStartX = width / 2 - tableGap / 2;
+    const cols = Math.min(2, this.canon.tablesCount);
+    const rows = Math.ceil(this.canon.tablesCount / cols);
+
+    const gridCenterX = panel.x;
+    const gridCenterY = panel.y + 20;
+
+    const gapX = 180;
+    const gapY = 145;
+
+    const startX = gridCenterX - ((cols - 1) * gapX) / 2;
+    const startY = gridCenterY - ((rows - 1) * gapY) / 2;
 
     for (let t = 0; t < this.canon.tablesCount; t++) {
-      const tableX = tableStartX + t * tableGap;
+      const col = t % cols;
+      const row = Math.floor(t / cols);
+
+      const tableX = startX + col * gapX;
+      const tableY = startY + row * gapY;
 
       const tableCircle = this.scene.add
-        .ellipse(tableX, tableY, 150, 102, 0xe5d3b3, 1)
+        .ellipse(tableX, tableY, 112, 78, 0xe5d3b3, 1)
         .setStrokeStyle(3, 0x6a4e32)
         .setScrollFactor(0)
         .setDepth(depth);
 
       const tableLabel = this.scene.add
-        .text(tableX, tableY - 72, `שולחן ${t + 1}`, {
+        .text(tableX, tableY - 54, `שולחן ${t + 1}`, {
           fontFamily: "Arial",
-          fontSize: "18px",
+          fontSize: "15px",
           color: "#3d2b1f",
           fontStyle: "bold",
         })
@@ -155,23 +163,23 @@ export default class WeddingSeatingBoardView {
       root.add([tableCircle, tableLabel]);
 
       const seatPositions = [
-        { x: tableX - 52, y: tableY - 14 },
-        { x: tableX, y: tableY - 24 },
-        { x: tableX + 52, y: tableY - 14 },
+        { x: tableX - 36, y: tableY - 8 },
+        { x: tableX, y: tableY - 18 },
+        { x: tableX + 36, y: tableY - 8 },
       ];
 
       for (let s = 0; s < this.canon.seatsPerTable; s++) {
         const pos = seatPositions[s];
 
         const bg = this.scene.add
-          .rectangle(pos.x, pos.y, 76, 36, 0xffffff, 0.96)
+          .rectangle(pos.x, pos.y, 58, 28, 0xffffff, 0.96)
           .setStrokeStyle(2, 0x8b7355)
           .setScrollFactor(0)
           .setDepth(depth + 1);
 
         const zone = this.scene.add
-          .zone(pos.x, pos.y, 92, 52)
-          .setRectangleDropZone(92, 52)
+          .zone(pos.x, pos.y, 72, 40)
+          .setRectangleDropZone(72, 40)
           .setScrollFactor(0)
           .setDepth(depth + 2);
 
@@ -196,10 +204,10 @@ export default class WeddingSeatingBoardView {
     onSubmit: () => void,
     depth: number
   ) {
-    const buttonY = panel.y + panel.height / 2 - 34;
+    const buttonY = panel.y + panel.height / 2 - 32;
 
     const submitBtnBg = this.scene.add
-      .rectangle(panel.x, buttonY, 150, 44, 0x6dbb75, 1)
+      .rectangle(panel.x, buttonY, 132, 40, 0x6dbb75, 1)
       .setStrokeStyle(2, 0x3a2a2a)
       .setScrollFactor(0)
       .setDepth(depth + 100)
@@ -208,7 +216,7 @@ export default class WeddingSeatingBoardView {
     const submitBtnLabel = this.scene.add
       .text(panel.x, buttonY, "בדיקה", {
         fontFamily: "Arial",
-        fontSize: "18px",
+        fontSize: "17px",
         color: "#ffffff",
         fontStyle: "bold",
       })

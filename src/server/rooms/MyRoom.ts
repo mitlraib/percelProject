@@ -96,6 +96,14 @@ export class MyRoom extends Room {
       this.metas[idx] = { name, avatar };
       this.broadcastPlayersMeta();
     });
+
+    // משימה נפתחה אצל שחקן – משדרים לכולם כדי להציג "X עוזר לי כרגע" אצל השאר
+    this.onMessage("taskStarted", (client: Client, msg: any) => {
+      const idx = this.players.indexOf(client.sessionId);
+      if (idx === -1) return;
+      const type = msg?.type === "noam" ? "noam" : "mom";
+      this.broadcast("taskStarted", { type, playerIndex: idx });
+    });
   }
 
   onJoin(client: Client) {

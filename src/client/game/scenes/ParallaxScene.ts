@@ -132,6 +132,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
     this.tasks = new TaskManager(this, this.momCtl, {
       taskSteps: [3, 10],
+      onTaskOpened: (_, type) => this.net?.sendTaskStarted?.(type),
       isBotPlayerIndex: (idx) => this.mode === "solo" && idx === 1,
       isLocalPlayerIndex: isLocalIdx,
       getStepWorldXY: (step) => ({
@@ -144,6 +145,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
     this.noamTasks = new NoamTaskManager(this, {
       steps: [27, 30],
+      onTaskOpened: (_, type) => this.net?.sendTaskStarted?.(type),
       isBotPlayerIndex: (idx) => this.mode === "solo" && idx === 1,
       isLocalPlayerIndex: isLocalIdx,
       getStepWorldXY: (step) => ({
@@ -424,6 +426,50 @@ export default class ParallaxScene extends Phaser.Scene {
         this.playPenaltyMove(playerIndex, deltaSteps);
       }
     );
+
+    this.net.on(
+      "taskStarted",
+      ({ type, playerIndex }: { type: "mom" | "noam"; playerIndex: number }) => {
+        const me = this.getMyIndex();
+        if (me !== null && playerIndex === me) return;
+
+        const name = this.getPlayerDisplayName(playerIndex);
+
+        if (type === "mom") {
+          const { x, y } = this.getStepWorldXY(10);
+          this.momCtl.showMomWithSpeech({
+            x,
+            y,
+            depth: 400,
+            targetHeightPx: 400,
+            speechText: `${name} עוזר/ת לי כרגע... מיד יתפנה אליכן.`,
+          });
+          this.time.delayedCall(3000, () => this.momCtl.hideAnimated());
+        } else {
+          this.noamTasks.showBusyMessage(name);
+        }
+      }
+    );
+  }
+
+  private getStepWorldXY(step: number): { x: number; y: number } {
+    return {
+      x: this.laneStartX + (step - 1) * this.stepSizePx,
+      y: this.groundY - Math.max(10, this.scale.height * 0.015),
+    };
+  }
+
+  private getPlayerDisplayName(playerIndex: number): string {
+    const fallback = this.hudCtl.getCharNames(
+      this.mode,
+      this.playerCount,
+      this.myPlayerIndex
+    );
+    const fromNet = this.net?.getState?.().names;
+    if (fromNet && fromNet[playerIndex] != null && fromNet[playerIndex] !== "") {
+      return fromNet[playerIndex] ?? fallback[playerIndex] ?? "שחקן";
+    }
+    return fallback[playerIndex] ?? "שחקן";
   }
 
   private attachSolo() {

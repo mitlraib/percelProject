@@ -8,6 +8,9 @@ import VendorsTaskUI, { type VendorsTaskUIResult } from "./noam/VendorsTaskUI";
 type NoamTaskManagerOpts = {
   steps?: number[];
 
+  /** נקרא כשמשימת נועם נפתחת אצל השחקן המקומי (לשליחה לרשת) */
+  onTaskOpened?: (playerIndex: number, type: "noam") => void;
+
   isBotPlayerIndex: (playerIndex: number) => boolean;
   isLocalPlayerIndex: (playerIndex: number) => boolean;
 
@@ -49,6 +52,19 @@ export default class NoamTaskManager {
 
   isLocked() {
     return this.locked;
+  }
+
+  /** מציג אצל שאר השחקנים: נועם עם הודעה "X עוזר לי כרגע... מיד יתפנה אליכן" ונעלם אחרי 3 שניות */
+  showBusyMessage(playerName: string) {
+    const { x, y } = this.opts.getStepWorldXY(27);
+    this.npc.show({
+      x,
+      y,
+      depth: 400,
+      targetHeightPx: 400,
+      speechText: `${playerName} עוזר/ת לי כרגע... מיד יתפנה אליכן.`,
+    });
+    this.scene.time.delayedCall(3000, () => this.npc.hideAll());
   }
 
   destroy() {
@@ -112,6 +128,8 @@ export default class NoamTaskManager {
     this.pendingDone = done;
 
     this.lockInternal();
+
+    this.opts.onTaskOpened?.(playerIndex, "noam");
 
     const { x, y } = this.opts.getStepWorldXY(stepForPos);
 

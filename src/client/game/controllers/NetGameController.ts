@@ -19,6 +19,7 @@ type MovePayload = { playerIndex: number; value: number };
 type PenaltyMovePayload = { playerIndex: number; deltaSteps: number };
 type RollDeniedPayload = { reason?: string; currentTurn?: number };
 type PlayersMetaPayload = { names?: (string | null)[]; avatars?: (string | null)[] };
+type TaskStartedPayload = { type: "mom" | "noam"; playerIndex: number };
 
 export default class NetGameController extends Phaser.Events.EventEmitter {
   private room: Room;
@@ -89,6 +90,10 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
       this.emit("rollDenied", p);
     });
 
+    room.onMessage("taskStarted", (p: TaskStartedPayload) => {
+      this.emit("taskStarted", p);
+    });
+
     this.room.send("sync");
   }
 
@@ -117,6 +122,11 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
   /** מבקש מהשרת שליחת מצב מלא – שימושי כשמחכים לשחקנים כדי לתפוס ready */
   requestSync() {
     this.room.send("sync");
+  }
+
+  /** מודיע לשרת ששחקן התחיל משימה – השרת משדר לכולם והאחרים רואים "X עוזר לי כרגע" */
+  sendTaskStarted(type: "mom" | "noam") {
+    this.room.send("taskStarted", { type });
   }
 
   private recomputeCanRoll() {

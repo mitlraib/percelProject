@@ -39,16 +39,24 @@ export default class WeddingSeatingCanon {
   readonly seatsPerTable: number;
 
   constructor() {
-    this.tablesCount = 2;
+    this.tablesCount = 4;
     this.seatsPerTable = 3;
 
     this.guests = [
       { id: "aunt-rachel", label: "דודה רחל", group: "family" },
       { id: "uncle-moshe", label: "דוד משה", group: "family" },
       { id: "cousin-dana", label: "בת דודה דנה", group: "family" },
+      { id: "grandma-sara", label: "סבתא שרה", group: "family" },
+      { id: "uncle-avi", label: "דוד אבי", group: "family" },
+      { id: "cousin-liat", label: "בת דודה ליאת", group: "family" },
+
       { id: "yossi", label: "יוסי", group: "friends" },
       { id: "noa", label: "נועה", group: "friends" },
       { id: "omer", label: "עומר", group: "friends" },
+      { id: "maya", label: "מאיה", group: "friends" },
+      { id: "ron", label: "רון", group: "friends" },
+
+      { id: "photographer-eden", label: "עדן הצלמת", group: "other" },
     ];
 
     this.rules = [
@@ -63,6 +71,18 @@ export default class WeddingSeatingCanon {
         a: "yossi",
         b: "noa",
         reason: "❌ יוסי ונועה חייבים לשבת יחד",
+      },
+      {
+        type: "notTogether",
+        a: "omer",
+        b: "ron",
+        reason: "❌ עומר ורון לא יכולים לשבת באותו שולחן",
+      },
+      {
+        type: "mustTogether",
+        a: "grandma-sara",
+        b: "cousin-liat",
+        reason: "❌ סבתא שרה וליאת חייבות לשבת יחד",
       },
     ];
   }

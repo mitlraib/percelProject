@@ -43,6 +43,18 @@
             display: block;
         }
 
+        /* במובייל: שומרים על יחס 16:9 כדי שלא יימתח לגובה יותר מדי */
+        @media (max-width: 768px) {
+            #game-container {
+                width: 100vw;
+                height: calc(100vw * 9 / 16);
+                max-height: 100vh;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+            }
+        }
+
         #fullscreen-btn {
             position: absolute;
             top: 12px;
