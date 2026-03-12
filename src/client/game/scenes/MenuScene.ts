@@ -71,17 +71,11 @@ export default class MenuScene extends Phaser.Scene {
       const mode: "solo" | "local" = count === 1 ? "solo" : "local";
       this.registry.set("playerCount", count);
       this.registry.set("mode", mode);
-      // אם זו שחקנית מארחת במולטיפלייר – ננקה קוד קודם, כדי ליצור חדש
       if (count > 1) {
-        this.registry.remove("roomCode");
         this.scene.start("player-setup-scene", { mode, playerCount: count });
       } else {
         this.scene.start("network-scene", { mode, playerCount: count });
       }
-    };
-
-    const joinByCode = () => {
-      this.scene.start("join-by-code-scene");
     };
 
     PLAYER_OPTIONS.forEach((opt, i) => {

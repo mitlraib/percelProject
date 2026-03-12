@@ -84,11 +84,13 @@ export default class WeddingSeatingGuestsController {
 
       // אזור שקוף ונפרד לגרירה — זה מה שפותר את ה"נגרר רק מהצד"
       const dragZone = this.scene.add
-        .zone(x, y, cardW, cardH)
-        .setRectangleDropZone(cardW, cardH)
-        .setScrollFactor(0)
-        .setDepth(this.opts.depth + 1)
-        .setInteractive({ useHandCursor: true });
+      .zone(x, y, cardW, cardH)
+      .setScrollFactor(0)
+      .setDepth(this.opts.depth + 1)
+      .setInteractive(
+        new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH),
+        Phaser.Geom.Rectangle.Contains
+      );
 
       this.scene.input.setDraggable(dragZone);
 
