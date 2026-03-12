@@ -5,6 +5,7 @@ import Phaser from "phaser";
 
 const REGISTRY_DISPLAY_NAME = "playerDisplayName";
 const REGISTRY_AVATAR_DATA_URL = "playerAvatarDataUrl";
+const REGISTRY_ROOM_CODE = "roomCode";
 
 type Mode = "solo" | "local";
 
@@ -137,6 +138,19 @@ export default class PlayerSetupScene extends Phaser.Scene {
   }
 
   private goToNetwork() {
+    // אם אנחנו המארחת (משחק מרובה שחקנים ללא קוד קיים) – ניצור קוד חדר של 4 תווים
+    if (this.mode === "local" && this.playerCount > 1) {
+      const existing = this.registry.get(REGISTRY_ROOM_CODE) as string | undefined;
+      if (!existing) {
+        const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let code = "";
+        for (let i = 0; i < 4; i++) {
+          code += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+        }
+        this.registry.set(REGISTRY_ROOM_CODE, code);
+      }
+    }
+
     this.removeDom();
     this.scene.start("network-scene", {
       mode: this.mode,
@@ -156,4 +170,4 @@ export default class PlayerSetupScene extends Phaser.Scene {
   }
 }
 
-export { REGISTRY_DISPLAY_NAME, REGISTRY_AVATAR_DATA_URL };
+export { REGISTRY_DISPLAY_NAME, REGISTRY_AVATAR_DATA_URL, REGISTRY_ROOM_CODE };

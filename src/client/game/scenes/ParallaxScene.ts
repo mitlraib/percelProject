@@ -15,7 +15,11 @@ import ParallaxLayoutManager from "./parallax/ParallaxLayoutManager";
 import ParallaxHudController from "./parallax/ParallaxHudController";
 import ParallaxTaskFlowController from "./parallax/ParallaxTaskFlowController";
 import type { ExtendedNetStateView, LayoutMetrics, Mode } from "./parallax/ParallaxTypes";
-import { REGISTRY_DISPLAY_NAME, REGISTRY_AVATAR_DATA_URL } from "./PlayerSetupScene";
+import {
+  REGISTRY_DISPLAY_NAME,
+  REGISTRY_AVATAR_DATA_URL,
+  REGISTRY_ROOM_CODE,
+} from "./PlayerSetupScene";
 
 export default class ParallaxScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -322,11 +326,12 @@ export default class ParallaxScene extends Phaser.Scene {
         this.ui.setDicePlayer("מחכה לשחקנים…", "⏳");
         this.ui.setDiceDisabled(true);
         this.ui.setDiceVisibleDeferred(false);
-        const fullId = this.room?.roomId ?? "";
-        const shortId = fullId ? fullId.slice(0, 4) : "";
-        this.currentTurnName = shortId
-          ? `מחכה לשחקנים… • קוד: ${shortId}`
-          : "מחכה לשחקנים…";
+        const code =
+          ((this.registry.get(REGISTRY_ROOM_CODE) as string | undefined) ?? "").toUpperCase();
+        this.currentTurnName =
+          code && code.length === 4
+            ? `מחכה לשחקנים… • קוד: ${code}`
+            : "מחכה לשחקנים…";
         this.refreshHUD();
         if (!this.waitingSyncTimer && this.net) {
           this.waitingSyncTimer = this.time.addEvent({

@@ -71,11 +71,17 @@ export default class MenuScene extends Phaser.Scene {
       const mode: "solo" | "local" = count === 1 ? "solo" : "local";
       this.registry.set("playerCount", count);
       this.registry.set("mode", mode);
+      // אם זו שחקנית מארחת במולטיפלייר – ננקה קוד קודם, כדי ליצור חדש
       if (count > 1) {
+        this.registry.remove("roomCode");
         this.scene.start("player-setup-scene", { mode, playerCount: count });
       } else {
         this.scene.start("network-scene", { mode, playerCount: count });
       }
+    };
+
+    const joinByCode = () => {
+      this.scene.start("join-by-code-scene");
     };
 
     PLAYER_OPTIONS.forEach((opt, i) => {
@@ -169,7 +175,38 @@ export default class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.startBtn = this.add.container(width / 2, startY + 2 * (cardH + gap) + 90, [
+    // כפתור "הצטרף עם קוד" – מתחת לכרטיסיות
+    const codeBtnW = Math.min(320, Math.floor(width * 0.75));
+    const codeBtnH = 48;
+    const codeBg = this.add
+      .rectangle(0, 0, codeBtnW, codeBtnH, 0x1a1a2e, 1)
+      .setStrokeStyle(2, 0x66ccff, 0.9);
+    const codeLabel = this.add
+      .text(0, 0, "🔗 הצטרף עם קוד חדר", {
+        fontFamily: "Arial",
+        fontSize: "18px",
+        color: "#66ccff",
+      })
+      .setOrigin(0.5);
+    const codeBtn = this.add
+      .container(width / 2, startY + 2 * (cardH + gap) + 40, [codeBg, codeLabel])
+      .setDepth(2);
+    codeBtn.setSize(codeBtnW, codeBtnH);
+    codeBtn.setInteractive(
+      new Phaser.Geom.Rectangle(-codeBtnW / 2, -codeBtnH / 2, codeBtnW, codeBtnH),
+      Phaser.Geom.Rectangle.Contains
+    );
+    codeBtn.on("pointerover", () => {
+      codeBg.setStrokeStyle(2, 0x66ccff, 1);
+      this.input.setDefaultCursor("pointer");
+    });
+    codeBtn.on("pointerout", () => {
+      codeBg.setStrokeStyle(2, 0x66ccff, 0.9);
+      this.input.setDefaultCursor("default");
+    });
+    codeBtn.on("pointerdown", joinByCode);
+
+    this.startBtn = this.add.container(width / 2, startY + 2 * (cardH + gap) + 105, [
       this.startBg,
       this.startLabel,
     ]);

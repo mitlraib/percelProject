@@ -67,10 +67,9 @@ export default class NetworkScene extends Phaser.Scene {
     }
 
     const wsUrl = getColyseusWsUrl();
-
-    // כל המצבים המרובי־שחקנים נכנסים לאותו סוג חדר ("my_room").
-    // Colyseus דואג לצרף את השחקנים לאותו חדר פתוח.
-    const roomName = "my_room";
+    const roomCode = (this.registry.get("roomCode") as string | undefined)?.toUpperCase();
+    const roomName =
+      roomCode && roomCode.length === 4 ? `my_room_${roomCode}` : "my_room";
     console.log("joining room ←", roomName, wsUrl);
 
     try {

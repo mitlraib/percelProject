@@ -42,7 +42,9 @@ export default class WeddingSeatingTask {
     if (this.board) return;
 
     const depth = this.opts.depth ?? 5000;
-    const durationSec = this.opts.durationSec ?? 90;
+
+    // ברירת מחדל קשיחה של 90 שניות
+    const durationSec = 90;
 
     this.tables = this.canon.createEmptyTables();
     this.finished = false;

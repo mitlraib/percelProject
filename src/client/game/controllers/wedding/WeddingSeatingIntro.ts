@@ -36,22 +36,23 @@ export default class WeddingSeatingIntro {
 
     if (dadKey) {
       this.introDad = this.scene.add
-        .image(width * 0.22, height * 0.64, dadKey)
+        .image(width * 0.22, height * 0.66, dadKey)
         .setScrollFactor(0)
         .setDepth(this.depth + 2);
 
       const tex = this.introDad.texture.getSourceImage() as HTMLImageElement;
       const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
 
-      const targetH = Math.min(250, height * 0.34);
+      // הוגדל משמעותית לעומת קודם
+      const targetH = Math.min(360, height * 0.5);
       this.introDad.setDisplaySize(targetH * ratio, targetH);
     }
 
     this.introBubble = this.createSpeechBubble(
-      width * 0.5,
-      height * 0.45,
-      Math.min(520, width * 0.48),
-      96,
+      width * 0.56,
+      height * 0.43,
+      Math.min(560, width * 0.5),
+      110,
       "אוי! תכף החתונה ויש כזה בלאגן בשולחנות.\nתוכלי לעזור לי לסדר את האורחים בשולחנות?",
       this.depth + 3
     );
