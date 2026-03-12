@@ -21,11 +21,6 @@ export default class WeddingSeatingGuestsController {
   private opts: GuestsControllerOpts;
 
   private guestCards: GuestCardWithDragZone[] = [];
-  private dropHandler?: (
-    pointer: Phaser.Input.Pointer,
-    gameObject: Phaser.GameObjects.GameObject,
-    dropZone: Phaser.GameObjects.GameObject
-  ) => void;
 
   constructor(scene: Phaser.Scene, canon: WeddingSeatingCanon, opts: GuestsControllerOpts) {
     this.scene = scene;
@@ -82,15 +77,14 @@ export default class WeddingSeatingGuestsController {
         .setDepth(this.opts.depth)
         .setSize(cardW, cardH);
 
-      // אזור שקוף ונפרד לגרירה — זה מה שפותר את ה"נגרר רק מהצד"
       const dragZone = this.scene.add
-      .zone(x, y, cardW, cardH)
-      .setScrollFactor(0)
-      .setDepth(this.opts.depth + 1)
-      .setInteractive(
-        new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH),
-        Phaser.Geom.Rectangle.Contains
-      );
+        .zone(x, y, cardW, cardH)
+        .setScrollFactor(0)
+        .setDepth(this.opts.depth + 1)
+        .setInteractive(
+          new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH),
+          Phaser.Geom.Rectangle.Contains
+        );
 
       this.scene.input.setDraggable(dragZone);
 
@@ -111,8 +105,6 @@ export default class WeddingSeatingGuestsController {
       this.setupGuestDrag(card);
       this.guestCards.push(card);
     });
-
-    this.registerDropHandler();
   }
 
   getGuestCards() {
@@ -140,7 +132,7 @@ export default class WeddingSeatingGuestsController {
       card.container.y = dragY;
     });
 
-    dragTarget.on("dragend", (_pointer: Phaser.Input.Pointer, dropped: boolean) => {
+    dragTarget.on("dragend", () => {
       if (this.opts.finished()) return;
 
       card.container.setScale(1);
@@ -148,29 +140,8 @@ export default class WeddingSeatingGuestsController {
       card.dragZone.setDepth(this.opts.depth + 1);
       this.highlightAllSeats(false);
 
-      // אם לא שוחרר על מושב חוקי -> תמיד חוזר למושב הקודם או לבית
-      if (!dropped) {
-        this.moveCardToSeatOrHome(card);
-        this.opts.statusText.setColor("#b00020");
-        this.opts.statusText.setText("❌ צריך להניח אורח רק על מקום ישיבה");
-      }
-    });
-  }
+      const seat = this.findSeatUnderCard(card);
 
-  private registerDropHandler() {
-    this.dropHandler = (
-      _pointer: Phaser.Input.Pointer,
-      gameObject: Phaser.GameObjects.GameObject,
-      dropZone: Phaser.GameObjects.GameObject
-    ) => {
-      if (this.opts.finished()) return;
-
-      const card = this.guestCards.find((c) => c.dragZone === gameObject);
-      if (!card) return;
-
-      const seat = this.opts.seats.find((s) => s.zone === dropZone);
-
-      // אם זה לא מושב אמיתי, לא משאירים את הכרטיס שם
       if (!seat) {
         this.moveCardToSeatOrHome(card);
         this.opts.statusText.setColor("#b00020");
@@ -179,9 +150,27 @@ export default class WeddingSeatingGuestsController {
       }
 
       this.placeCardInSeat(card, seat.tableId, seat.seatIndex);
-    };
+    });
+  }
 
-    this.scene.input.on(Phaser.Input.Events.DROP, this.dropHandler, this);
+  private findSeatUnderCard(card: GuestCardWithDragZone): SeatView | null {
+    const snapDistance = 34;
+
+    let bestSeat: SeatView | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const seat of this.opts.seats) {
+      const dx = card.container.x - seat.x;
+      const dy = card.container.y - seat.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist <= snapDistance && dist < bestDistance) {
+        bestDistance = dist;
+        bestSeat = seat;
+      }
+    }
+
+    return bestSeat;
   }
 
   private placeCardInSeat(card: GuestCardWithDragZone, tableId: number, seatIndex: number) {
@@ -276,11 +265,6 @@ export default class WeddingSeatingGuestsController {
   }
 
   destroy() {
-    if (this.dropHandler) {
-      this.scene.input.off(Phaser.Input.Events.DROP, this.dropHandler, this);
-      this.dropHandler = undefined;
-    }
-
     for (const card of this.guestCards) {
       card.dragZone.destroy();
       card.container.destroy();

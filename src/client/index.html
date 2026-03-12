@@ -43,31 +43,6 @@
             display: block;
         }
 
-        /* במובייל: יחס 16:9 קבוע – המסך לא מתוח לגובה ולא צר */
-        @media (max-width: 768px) {
-            #app {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-            #game-container {
-                width: 100vw;
-                height: calc(100vw * 9 / 16);
-                max-width: calc(100vh * 16 / 9);
-                max-height: 100vh;
-                position: absolute;
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%);
-                inset: auto;
-            }
-            #game-container canvas {
-                width: 100% !important;
-                height: 100% !important;
-                object-fit: contain;
-            }
-        }
-
         #fullscreen-btn {
             position: absolute;
             top: 12px;
