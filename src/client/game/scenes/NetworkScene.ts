@@ -67,25 +67,21 @@ export default class NetworkScene extends Phaser.Scene {
     }
 
     const wsUrl = getColyseusWsUrl();
-    const roomCodeToJoin = this.registry.get("roomCodeToJoin") as string | undefined;
+
+    // כל המצבים המרובי־שחקנים נכנסים לאותו סוג חדר ("my_room").
+    // Colyseus דואג לצרף את השחקנים לאותו חדר פתוח.
+    const roomName = "my_room";
+    console.log("joining room ←", roomName, wsUrl);
 
     try {
-      if (roomCodeToJoin && typeof roomCodeToJoin === "string" && roomCodeToJoin.trim()) {
-        this.registry.remove("roomCodeToJoin");
-        console.log("joining room by id ←", roomCodeToJoin.trim(), wsUrl);
-        this.room = await this.client.joinById(roomCodeToJoin.trim());
-      } else {
-        const roomName = "my_room";
-        console.log("joining room ←", roomName, wsUrl);
-        this.room = await this.client.joinOrCreate(roomName);
-      }
+      this.room = await this.client.joinOrCreate(roomName);
       console.log("joined room ✔", {
         name: this.room.name,
         sessionId: this.room.sessionId,
         roomId: this.room.roomId,
       });
     } catch (err) {
-      console.error("FAILED join ←", err);
+      console.error("FAILED joinOrCreate ←", err);
       this.showConnectionError(wsUrl);
       return;
     }

@@ -78,10 +78,6 @@ export default class MenuScene extends Phaser.Scene {
       }
     };
 
-    const joinByCode = () => {
-      this.scene.start("join-by-code-scene");
-    };
-
     PLAYER_OPTIONS.forEach((opt, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
@@ -156,37 +152,6 @@ export default class MenuScene extends Phaser.Scene {
       this.optionButtons.push({ opt, container, bg });
     });
 
-    // הצטרף עם קוד – כפתור נפרד
-    const codeBtnW = Math.min(320, Math.floor(width * 0.75));
-    const codeBtnH = 48;
-    const codeBtnBg = this.add
-      .rectangle(0, 0, codeBtnW, codeBtnH, 0x1a1a2e, 1)
-      .setStrokeStyle(2, 0x66ccff, 0.8);
-    const codeBtnLabel = this.add
-      .text(0, 0, "🔗 הצטרף עם קוד חדר", {
-        fontFamily: "Arial",
-        fontSize: "18px",
-        color: "#66ccff",
-      })
-      .setOrigin(0.5);
-    const codeBtn = this.add
-      .container(width / 2, startY + 2 * (cardH + gap) + 35, [codeBtnBg, codeBtnLabel])
-      .setDepth(2);
-    codeBtn.setSize(codeBtnW, codeBtnH);
-    codeBtn.setInteractive(
-      new Phaser.Geom.Rectangle(-codeBtnW / 2, -codeBtnH / 2, codeBtnW, codeBtnH),
-      Phaser.Geom.Rectangle.Contains
-    );
-    codeBtn.on("pointerover", () => {
-      codeBtnBg.setStrokeStyle(2, 0x66ccff, 1);
-      this.input.setDefaultCursor("pointer");
-    });
-    codeBtn.on("pointerout", () => {
-      codeBtnBg.setStrokeStyle(2, 0x66ccff, 0.8);
-      this.input.setDefaultCursor("default");
-    });
-    codeBtn.on("pointerdown", joinByCode);
-
     // Start button
     const btnW = Math.min(420, Math.floor(width * 0.7));
     const btnH = 64;
@@ -204,7 +169,7 @@ export default class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.startBtn = this.add.container(width / 2, startY + 2 * (cardH + gap) + 100, [
+    this.startBtn = this.add.container(width / 2, startY + 2 * (cardH + gap) + 90, [
       this.startBg,
       this.startLabel,
     ]);

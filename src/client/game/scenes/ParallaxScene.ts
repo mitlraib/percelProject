@@ -322,9 +322,11 @@ export default class ParallaxScene extends Phaser.Scene {
         this.ui.setDicePlayer("מחכה לשחקנים…", "⏳");
         this.ui.setDiceDisabled(true);
         this.ui.setDiceVisibleDeferred(false);
-        this.currentTurnName =
-          "מחכה לשחקנים…" +
-          (this.room?.roomId ? " • קוד: " + this.room.roomId : "");
+        const fullId = this.room?.roomId ?? "";
+        const shortId = fullId ? fullId.slice(0, 4) : "";
+        this.currentTurnName = shortId
+          ? `מחכה לשחקנים… • קוד: ${shortId}`
+          : "מחכה לשחקנים…";
         this.refreshHUD();
         if (!this.waitingSyncTimer && this.net) {
           this.waitingSyncTimer = this.time.addEvent({

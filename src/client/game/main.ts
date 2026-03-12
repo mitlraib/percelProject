@@ -1,6 +1,5 @@
 import Phaser from "phaser";
 import MenuScene from "./scenes/MenuScene";
-import JoinByCodeScene from "./scenes/JoinByCodeScene";
 import PlayerSetupScene from "./scenes/PlayerSetupScene";
 import NetworkScene from "./scenes/NetworkScene";
 import ParallaxScene from "./scenes/ParallaxScene";
@@ -35,7 +34,7 @@ export default function startGame() {
       },
     },
 
-    scene: [MenuScene, JoinByCodeScene, PlayerSetupScene, NetworkScene, ParallaxScene],
+    scene: [MenuScene, PlayerSetupScene, NetworkScene, ParallaxScene],
   };
 
   return new Phaser.Game(config);

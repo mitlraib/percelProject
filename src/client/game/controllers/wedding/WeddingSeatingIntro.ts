@@ -42,7 +42,8 @@ export default class WeddingSeatingIntro {
 
       const tex = this.introDad.texture.getSourceImage() as HTMLImageElement;
       const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
-      const targetH = Math.min(180, height * 0.24);
+
+      const targetH = Math.min(250, height * 0.34);
       this.introDad.setDisplaySize(targetH * ratio, targetH);
     }
 
