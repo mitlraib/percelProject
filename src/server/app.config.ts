@@ -1,5 +1,5 @@
   import {defineServer, defineRoom, monitor, playground, createRouter, createEndpoint,} from "colyseus";
-  import type { Request, Response } from "express";
+  import type { Request, Response, NextFunction } from "express";
   import { MyRoom } from "./rooms/MyRoom.js";
 import { DuoRoom } from "./rooms/DuoRoom.js";
   
@@ -18,6 +18,20 @@ import { DuoRoom } from "./rooms/DuoRoom.js";
     }),
 
     express: (app) => {
+      // מאפשרים גישה מהדומיין של הקליינט (Render) – CORS פשוט לכל המקורות
+      app.use((req: Request, res: Response, next: NextFunction) => {
+        res.header("Access-Control-Allow-Origin", "*");
+        res.header(
+          "Access-Control-Allow-Headers",
+          "Origin, X-Requested-With, Content-Type, Accept"
+        );
+        res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+        if (req.method === "OPTIONS") {
+          res.sendStatus(200);
+          return;
+        }
+        next();
+      });
       app.get("/hi", (req: Request, res: Response) => {
         res.send("It's time to kick ass and chew bubblegum!");
       });

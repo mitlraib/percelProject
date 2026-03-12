@@ -67,9 +67,7 @@ export default class NetworkScene extends Phaser.Scene {
     }
 
     const wsUrl = getColyseusWsUrl();
-    const roomCode = (this.registry.get("roomCode") as string | undefined)?.toUpperCase();
-    const roomName =
-      roomCode && roomCode.length === 4 ? `my_room_${roomCode}` : "my_room";
+    const roomName = "my_room";
     console.log("joining room ←", roomName, wsUrl);
 
     try {
