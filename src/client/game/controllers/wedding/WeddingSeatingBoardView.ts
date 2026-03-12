@@ -113,7 +113,9 @@ export default class WeddingSeatingBoardView {
   }
 
   private buildRulesText(): string {
-    const lines = this.canon.rules.map((rule, index) => `${index + 1}. ${rule.reason.replace("❌ ", "")}`);
+    const lines = this.canon.rules.map(
+      (rule, index) => `${index + 1}. ${rule.reason.replace("❌ ", "")}`
+    );
     return ["חוקים:", ...lines].join("\n");
   }
 
@@ -163,23 +165,23 @@ export default class WeddingSeatingBoardView {
       root.add([tableCircle, tableLabel]);
 
       const seatPositions = [
-        { x: tableX - 36, y: tableY - 8 },
-        { x: tableX, y: tableY - 18 },
-        { x: tableX + 36, y: tableY - 8 },
+        { x: tableX - 48, y: tableY - 8 },
+        { x: tableX, y: tableY - 20 },
+        { x: tableX + 48, y: tableY - 8 },
       ];
 
       for (let s = 0; s < this.canon.seatsPerTable; s++) {
         const pos = seatPositions[s];
 
         const bg = this.scene.add
-          .rectangle(pos.x, pos.y, 58, 28, 0xffffff, 0.96)
+          .rectangle(pos.x, pos.y, 54, 26, 0xffffff, 0.96)
           .setStrokeStyle(2, 0x8b7355)
           .setScrollFactor(0)
           .setDepth(depth + 1);
 
         const zone = this.scene.add
-          .zone(pos.x, pos.y, 72, 40)
-          .setRectangleDropZone(72, 40)
+          .zone(pos.x, pos.y, 62, 34)
+          .setRectangleDropZone(62, 34)
           .setScrollFactor(0)
           .setDepth(depth + 2);
 

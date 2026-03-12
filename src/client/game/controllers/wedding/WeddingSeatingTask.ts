@@ -42,7 +42,7 @@ export default class WeddingSeatingTask {
     if (this.board) return;
 
     const depth = this.opts.depth ?? 5000;
-    const durationSec = this.opts.durationSec ?? 60;
+    const durationSec = this.opts.durationSec ?? 90;
 
     this.tables = this.canon.createEmptyTables();
     this.finished = false;

@@ -34,9 +34,6 @@ export default class WeddingSeatingGuestsController {
 
     const cardW = 96;
     const cardH = 30;
-    const hitW = 104;
-    const hitH = 36;
-
     const perSide = Math.ceil(guests.length / 2);
 
     const leftX = panel.x - panel.width / 2 + 90;
@@ -73,13 +70,17 @@ export default class WeddingSeatingGuestsController {
         })
         .setOrigin(0.5);
 
+      const hitArea = this.scene.add
+        .rectangle(0, 0, cardW, cardH, 0xffffff, 0.001)
+        .setInteractive({ useHandCursor: true });
+
       const container = this.scene.add
-        .container(x, y, [bg, label])
+        .container(x, y, [bg, label, hitArea])
         .setScrollFactor(0)
         .setDepth(this.opts.depth)
-        .setSize(hitW, hitH)
+        .setSize(cardW, cardH)
         .setInteractive(
-          new Phaser.Geom.Rectangle(-hitW / 2, -hitH / 2, hitW, hitH),
+          new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH),
           Phaser.Geom.Rectangle.Contains
         );
 
