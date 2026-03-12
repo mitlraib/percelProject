@@ -67,7 +67,8 @@ export default class NetworkScene extends Phaser.Scene {
     }
 
     const wsUrl = getColyseusWsUrl();
-    const roomName = "my_room";
+    // 2 שחקנים → duo_room, 3–4 → my_room
+    const roomName = this.playerCount === 2 ? "duo_room" : "my_room";
     console.log("joining room ←", roomName, wsUrl);
 
     try {

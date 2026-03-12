@@ -36,15 +36,14 @@ export default class WeddingSeatingIntro {
 
     if (dadKey) {
       this.introDad = this.scene.add
-        .image(width * 0.22, height * 0.66, dadKey)
+        .image(width * 0.22, height * 0.68, dadKey)
         .setScrollFactor(0)
         .setDepth(this.depth + 2);
 
       const tex = this.introDad.texture.getSourceImage() as HTMLImageElement;
       const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
 
-      // הוגדל משמעותית לעומת קודם
-      const targetH = Math.min(360, height * 0.5);
+      const targetH = Math.min(420, height * 0.58);
       this.introDad.setDisplaySize(targetH * ratio, targetH);
     }
 

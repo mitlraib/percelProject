@@ -179,7 +179,7 @@ export default class WeddingSeatingBoardView {
           .setScrollFactor(0)
           .setDepth(depth + 1);
 
-        const zone = this.scene.add
+          const zone = this.scene.add
           .zone(pos.x, pos.y, 62, 34)
           .setRectangleDropZone(62, 34)
           .setScrollFactor(0)
