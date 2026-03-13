@@ -60,6 +60,9 @@ export default class ParallaxScene extends Phaser.Scene {
   // מהירות תנועת השחקנים קדימה – מעט יותר איטית
   private readonly MOVE_MS = 1350;
 
+  // תמונת אווטאר מקומית (לא עוברת דרך השרת, רק אצל השחקן עצמו)
+  private localAvatarDataUrl: string | null = null;
+
   private readonly fixedDiceSeqPlayer0 = [5, 2, 3, 5, 6, 6];
   private fixedDiceSeqIndex0 = 0;
 
@@ -424,6 +427,9 @@ export default class ParallaxScene extends Phaser.Scene {
     const displayName = this.registry.get(REGISTRY_DISPLAY_NAME) as string | undefined;
     const avatarDataUrl = this.registry.get(REGISTRY_AVATAR_DATA_URL) as string | undefined;
 
+    // נשמור את תמונת האווטאר המקומית לשימוש בצד הקליינט בלבד
+    this.localAvatarDataUrl = avatarDataUrl ?? null;
+
     if (displayName || avatarDataUrl) {
       this.net.sendPlayerMeta(displayName, avatarDataUrl);
     }
@@ -514,6 +520,8 @@ export default class ParallaxScene extends Phaser.Scene {
 
       const emojis = ["👧", "🐶", "🐻", "🎮"];
 
+      const me = this.getMyIndex();
+
       try {
         const avatars = s.avatars ?? [];
         avatars.forEach((dataUrl, idx) => {
@@ -531,9 +539,26 @@ export default class ParallaxScene extends Phaser.Scene {
             this.players?.setPlayerTexture(idx, key);
           }
         });
+
+        // אם אין אווטאר מהשרת עבורי ויש לי תמונה מקומית – נשתמש בה רק אצל הקליינט שלי
+        if (
+          me !== null &&
+          this.localAvatarDataUrl &&
+          (!s.avatars || !s.avatars[me]) &&
+          this.localAvatarDataUrl.startsWith("data:image")
+        ) {
+          const localKey = `player-local-avatar-${me}`;
+          if (!this.textures.exists(localKey)) {
+            this.textures.once("addtexture", (texKey: string) => {
+              if (texKey === localKey) this.players?.setPlayerTexture(me, localKey);
+            });
+            this.textures.addBase64(localKey, this.localAvatarDataUrl);
+          } else {
+            this.players?.setPlayerTexture(me, localKey);
+          }
+        }
       } catch {}
 
-      const me = this.getMyIndex();
       const myIdxForUI = me ?? 0;
       const myName = names[myIdxForUI] ?? "שחקן";
       const myEmoji = emojis[myIdxForUI] ?? "🎮";

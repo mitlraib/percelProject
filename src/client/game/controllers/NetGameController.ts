@@ -216,10 +216,18 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
   }
 
   sendPlayerMeta(name?: string, avatar?: string) {
-    const safeAvatar =
-      avatar && avatar.length > 120_000
-        ? undefined
-        : avatar;
+    // נשלח לשרת שם + תמונה דחוסה, עם הגנה על גודל
+    let safeAvatar = avatar;
+
+    // אם התמונה עדיין גדולה מדי (dataURL ארוך), לא נשלח אותה בכלל כדי לא לשבור את החיבור
+    const MAX_AVATAR_CHARS = 50_000;
+    if (safeAvatar && safeAvatar.length > MAX_AVATAR_CHARS) {
+      console.warn("[CLIENT] avatar too large, skipping send to server", {
+        length: safeAvatar.length,
+        max: MAX_AVATAR_CHARS,
+      });
+      safeAvatar = undefined;
+    }
 
     console.log("[CLIENT] sendPlayerMeta", {
       name,

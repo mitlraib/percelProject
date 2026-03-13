@@ -123,9 +123,8 @@ export default class PlayerSetupScene extends Phaser.Scene {
 
     const file = this.fileInput.files?.[0];
     if (file) {
-      // תמונה גדולה מדי גורמת לבעיות ברשת (Max payload size exceeded).
-      // נגביל לגודל קטן יותר ונמשיך בלי תמונה אם חורג.
-      const MAX_BYTES = 60 * 1024; // ~60KB
+      // תמונה ענקית יכולה ליצור בעיות רשת, נגביל לגודל סביר של קובץ מקור.
+      const MAX_BYTES = 600 * 1024; // ~600KB לקובץ המקורי
       if (file.size > MAX_BYTES) {
         alert("התמונה שבחרת גדולה מדי. נשתמש בלי תמונה כדי שהמשחק ירוץ חלק.");
         this.registry.remove(REGISTRY_AVATAR_DATA_URL);
@@ -134,9 +133,24 @@ export default class PlayerSetupScene extends Phaser.Scene {
       }
 
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         const dataUrl = reader.result as string;
-        this.registry.set(REGISTRY_AVATAR_DATA_URL, dataUrl);
+
+        if (!dataUrl || !dataUrl.startsWith("data:image")) {
+          this.registry.remove(REGISTRY_AVATAR_DATA_URL);
+          this.goToNetwork();
+          return;
+        }
+
+        try {
+          // נקטין ונכווץ את התמונה מראש כדי שתהיה קטנה ומתאימה לרשת
+          const resized = await this.downscaleImage(dataUrl, 96, 96);
+          this.registry.set(REGISTRY_AVATAR_DATA_URL, resized);
+        } catch {
+          // אם משהו נכשל בדחיסה – נמשיך פשוט בלי תמונה
+          this.registry.remove(REGISTRY_AVATAR_DATA_URL);
+        }
+
         this.goToNetwork();
       };
       reader.readAsDataURL(file);
@@ -144,6 +158,47 @@ export default class PlayerSetupScene extends Phaser.Scene {
       this.registry.remove(REGISTRY_AVATAR_DATA_URL);
       this.goToNetwork();
     }
+  }
+
+  /** מקטין תמונת dataURL לגודל מירבי וממיר ל‑JPEG דחוס כדי שתתאים לשליחה ברשת. */
+  private downscaleImage(dataUrl: string, maxWidth: number, maxHeight: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+
+          const ratio = Math.min(
+            maxWidth / img.width,
+            maxHeight / img.height,
+            1 // לא נמתח תמונה קטנה, רק נקטין גדולות
+          );
+
+          const targetW = Math.max(1, Math.round(img.width * ratio));
+          const targetH = Math.max(1, Math.round(img.height * ratio));
+
+          canvas.width = targetW;
+          canvas.height = targetH;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("no canvas context"));
+            return;
+          }
+
+          ctx.clearRect(0, 0, targetW, targetH);
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+
+          // JPEG דחוס – בדרך כלל כמה עשרות KB בלבד
+          const compressed = canvas.toDataURL("image/jpeg", 0.7);
+          resolve(compressed);
+        } catch (e) {
+          reject(e instanceof Error ? e : new Error("downscale failed"));
+        }
+      };
+      img.onerror = () => reject(new Error("image load failed"));
+      img.src = dataUrl;
+    });
   }
 
   private goToNetwork() {

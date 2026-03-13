@@ -57,7 +57,7 @@ export default class PlayerManager {
       const y = this.groundY - offset;
 
       const img = this.scene.add.image(0, 0, tex).setOrigin(0.5, 1);
-      img.setScale(this.targetHeight / img.height);
+      this.applyTargetScale(img);
 
       const fontPx = Math.max(14, Math.round(this.targetHeight * 0.22));
 
@@ -108,7 +108,7 @@ export default class PlayerManager {
       container.y = this.groundY - offset;
       container.setDepth(this.depth);
 
-      sprite.setScale(this.targetHeight / sprite.height);
+      this.applyTargetScale(sprite);
 
       const fontPx = Math.max(14, Math.round(this.targetHeight * 0.22));
       totalText.setStyle({ fontSize: `${fontPx}px` });
@@ -132,7 +132,25 @@ export default class PlayerManager {
     const sprite = this.sprites[playerIndex];
     if (!sprite) return;
     sprite.setTexture(textureKey);
-    sprite.setScale(this.targetHeight / sprite.height);
+    this.applyTargetScale(sprite);
+  }
+
+  /** מגדיר סקייל כך שהדמות תהיה בגובה אחיד ולא תתפרס לרוחב מוגזם (למשל לוגואים רחבים). */
+  private applyTargetScale(img: Phaser.GameObjects.Image) {
+    if (!img.height || !img.width) {
+      return;
+    }
+
+    // גובה בסיסי
+    let scale = this.targetHeight / img.height;
+    img.setScale(scale);
+
+    // אם אחרי הסקייל הרוחב עדיין גדול מדי ביחס לגובה – נצמצם אותו
+    const maxWidth = this.targetHeight * 0.9; // בערך ריבועי
+    if (img.displayWidth > maxWidth) {
+      scale = maxWidth / img.width;
+      img.setScale(scale);
+    }
   }
 
   getContainer(index: number) {
