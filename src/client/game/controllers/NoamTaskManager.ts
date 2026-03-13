@@ -62,7 +62,7 @@ export default class NoamTaskManager {
       y,
       depth: 400,
       targetHeightPx: 400,
-      speechText: `${playerName} עוזר/ת לי כרגע... מיד יתפנה אליכן.`,
+      speechText: `${playerName} עוזרת לי כרגע... מיד היא תתפנה אליכן.`,
     });
     this.scene.time.delayedCall(3000, () => this.npc.hideAll());
   }

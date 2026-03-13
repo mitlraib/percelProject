@@ -4,7 +4,14 @@ import type { LayoutMetrics } from "./ParallaxTypes";
 export default class ParallaxLayoutManager {
   compute(width: number, height: number): LayoutMetrics {
     const safeWidth = Math.max(width, 320);
-    const safeHeight = Math.max(height, 480);
+
+    // במכשירים גבוהים מאוד (נייד אנכי) נקטין את גובה הלייאאוט,
+    // כדי שלא תתקבל תחושה של "מסך צר וארוך". נוסיף יותר "שמיים" מעל.
+    const aspect = height / Math.max(width, 1);
+    const maxLayoutHeight =
+      aspect > 1.5 ? Math.min(height, safeWidth * 1.4) : height;
+
+    const safeHeight = Math.max(maxLayoutHeight, 480);
 
     const laneStartX = Math.round(safeWidth * 0.1);
     const stepSizePx = Math.round(

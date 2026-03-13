@@ -177,30 +177,58 @@ export default class WeddingSeatingGuestsController {
   private placeCardInSeat(card: GuestCardWithDragZone, tableId: number, seatIndex: number) {
     const seatValue = this.opts.tables[tableId].seatGuestIds[seatIndex];
 
+    // אם יש שם אורח אחר – נבצע "החלפה" ביניהם במקום לחסום לגמרי.
     if (seatValue && seatValue !== card.guest.id) {
-      this.opts.statusText.setColor("#b00020");
-      this.opts.statusText.setText("❌ המקום הזה כבר תפוס");
-      this.moveCardToSeatOrHome(card);
-      return;
-    }
+      const otherCard = this.guestCards.find(
+        (c) => c.currentSeat?.tableId === tableId && c.currentSeat?.seatIndex === seatIndex
+      );
 
-    this.removeGuestFromCurrentSeat(card);
+      if (otherCard) {
+        // משחררים את המקום הקודם של האורח הנגרר
+        const prevSeat = card.currentSeat;
+        this.removeGuestFromCurrentSeat(card);
 
-    const existingCardOnSeat = this.guestCards.find(
-      (c) => c.currentSeat?.tableId === tableId && c.currentSeat?.seatIndex === seatIndex
-    );
+        // מעדכנים את המערך הטבלאות עבור שני האורחים
+        if (prevSeat) {
+          this.opts.tables[prevSeat.tableId].seatGuestIds[prevSeat.seatIndex] = otherCard.guest.id;
+        }
+        this.opts.tables[tableId].seatGuestIds[seatIndex] = card.guest.id;
 
-    if (existingCardOnSeat && existingCardOnSeat !== card) {
-      if (existingCardOnSeat.currentSeat) {
-        const prev = existingCardOnSeat.currentSeat;
-        this.opts.tables[prev.tableId].seatGuestIds[prev.seatIndex] = null;
+        // מעבירים את האורח השני למקום הקודם (או הביתה אם לא היה לו מקום)
+        if (prevSeat) {
+          otherCard.currentSeat = { tableId: prevSeat.tableId, seatIndex: prevSeat.seatIndex };
+          const prevSeatView = this.opts.seats.find(
+            (s) => s.tableId === prevSeat.tableId && s.seatIndex === prevSeat.seatIndex
+          );
+          if (prevSeatView) {
+            this.tweenCardTo(otherCard, prevSeatView.x, prevSeatView.y);
+          } else {
+            otherCard.currentSeat = null;
+            this.tweenCardTo(otherCard, otherCard.homeX, otherCard.homeY);
+          }
+        } else {
+          // אם לא היה מקום קודם – האורח השני חוזר לרשימת האורחים
+          this.opts.tables[tableId].seatGuestIds[seatIndex] = card.guest.id;
+          this.opts.statusText.setColor("#2d4a22");
+          this.opts.statusText.setText("✔️ החלפתם בין אורחים");
+
+          this.opts.tables[tableId].seatGuestIds[seatIndex] = card.guest.id;
+          otherCard.currentSeat = null;
+          this.tweenCardTo(otherCard, otherCard.homeX, otherCard.homeY);
+        }
+      } else {
+        // במקרה קצה – נ fallback להתנהגות הישנה
+        this.opts.statusText.setColor("#b00020");
+        this.opts.statusText.setText("❌ המקום הזה כבר תפוס");
+        this.moveCardToSeatOrHome(card);
+        return;
       }
-
-      existingCardOnSeat.currentSeat = null;
-      this.tweenCardTo(existingCardOnSeat, existingCardOnSeat.homeX, existingCardOnSeat.homeY);
+    } else {
+      // המקום ריק או זה אותו אורח – פשוט מעבירים אליו
+      this.removeGuestFromCurrentSeat(card);
+      this.opts.tables[tableId].seatGuestIds[seatIndex] = card.guest.id;
     }
 
-    this.opts.tables[tableId].seatGuestIds[seatIndex] = card.guest.id;
     card.currentSeat = { tableId, seatIndex };
 
     const seatView = this.opts.seats.find(

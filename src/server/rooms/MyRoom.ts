@@ -101,7 +101,9 @@ export class MyRoom extends Room {
     this.onMessage("taskStarted", (client: Client, msg: any) => {
       const idx = this.players.indexOf(client.sessionId);
       if (idx === -1) return;
-      const type = msg?.type === "noam" ? "noam" : "mom";
+      const rawType = msg?.type;
+      const type: "mom" | "noam" | "dad" =
+        rawType === "noam" ? "noam" : rawType === "dad" ? "dad" : "mom";
       this.broadcast("taskStarted", { type, playerIndex: idx });
     });
   }

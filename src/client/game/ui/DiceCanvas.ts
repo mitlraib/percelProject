@@ -57,8 +57,9 @@ export default class DiceCanvas extends Phaser.GameObjects.Container {
 
   /**
    * אנימציה ויזואלית בלבד – לא חוסמת את המשחק.
+   * איטית יותר כדי להרגיש "גלגול" ברור.
    */
-  playVisualRoll(finalValue: number, durationMs = 350) {
+  playVisualRoll(finalValue: number, durationMs = 700) {
     if (this.rolling) {
       this.stopRollingVisuals();
     }

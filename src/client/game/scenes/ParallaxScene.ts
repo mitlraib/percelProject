@@ -57,7 +57,8 @@ export default class ParallaxScene extends Phaser.Scene {
   private laneOffsets: number[] = [];
   private playerTargetHeight = 70;
 
-  private readonly MOVE_MS = 900;
+  // מהירות תנועת השחקנים קדימה – מעט יותר איטית
+  private readonly MOVE_MS = 1350;
 
   private readonly fixedDiceSeqPlayer0 = [5, 2, 3, 5, 6, 6];
   private fixedDiceSeqIndex0 = 0;
@@ -292,6 +293,9 @@ export default class ParallaxScene extends Phaser.Scene {
       if (this.net) {
         if (this.getMyIndex() === null) return;
         if (!this.net.canRollNow()) return;
+
+        // מפעילים את האנימציה עם הערך הסופי (כולל הרצף הקבוע לילדה) – איטית יותר
+        this.ui.dice.playVisualRoll(finalValue, 600);
 
         this.ui.setDiceVisibleDeferred(true);
 
@@ -624,7 +628,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
     this.net.on(
       "taskStarted",
-      ({ type, playerIndex }: { type: "mom" | "noam"; playerIndex: number }) => {
+      ({ type, playerIndex }: { type: "mom" | "noam" | "dad"; playerIndex: number }) => {
         console.log("[CLIENT][ParallaxScene] net taskStarted listener", {
           type,
           playerIndex,
@@ -647,8 +651,91 @@ export default class ParallaxScene extends Phaser.Scene {
             speechText: `${name} עוזר/ת לי כרגע... מיד יתפנה אליכן.`,
           });
           this.time.delayedCall(3000, () => this.momCtl.hideAnimated());
-        } else {
+        } else if (type === "noam") {
           this.noamTasks.showBusyMessage(name);
+        } else {
+          // משימת אבא – מציגים אבא עם בועת דיבור לשאר השחקנים
+          const { width, height } = this.scale;
+          const dadKey = this.textures.exists("DAD")
+            ? "DAD"
+            : this.textures.exists("dad")
+            ? "dad"
+            : null;
+
+          if (!dadKey) {
+            return;
+          }
+
+          const dad = this.add
+            .image(width * 0.22, height * 0.9, dadKey)
+            .setScrollFactor(0)
+            .setDepth(9000);
+
+          const tex = dad.texture.getSourceImage() as HTMLImageElement;
+          const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
+          const targetH = Math.min(360, height * 0.55);
+          dad.setDisplaySize(targetH * ratio, targetH);
+
+          const bubbleWidth = Math.min(560, width * 0.5);
+          const bubbleHeight = 110;
+
+          const bg = this.add
+            .rectangle(0, 0, bubbleWidth, bubbleHeight, 0xffffff, 0.98)
+            .setStrokeStyle(3, 0x4b2e2e);
+
+          const tail = this.add
+            .triangle(
+              -(bubbleWidth / 2) + 28,
+              bubbleHeight / 2 - 4,
+              0,
+              0,
+              18,
+              0,
+              5,
+              16,
+              0xffffff,
+              0.98
+            )
+            .setStrokeStyle(2, 0x4b2e2e);
+
+          const label = this.add
+            .text(0, 0, `${name} עוזר/ת לי כרגע לסדר את השולחנות... מיד יתפנה אליכן.`, {
+              fontFamily: "Arial",
+              fontSize: "18px",
+              color: "#3a1f1f",
+              align: "center",
+              wordWrap: { width: bubbleWidth - 30 },
+              rtl: true,
+            })
+            .setOrigin(0.5);
+
+          const bubble = this.add
+            .container(width * 0.6, height * 0.45, [bg, tail, label])
+            .setScrollFactor(0)
+            .setDepth(9001);
+
+          dad.setAlpha(0);
+          bubble.setAlpha(0);
+
+          this.tweens.add({
+            targets: [dad, bubble],
+            alpha: 1,
+            duration: 180,
+            ease: "Sine.easeOut",
+          });
+
+          this.time.delayedCall(3000, () => {
+            this.tweens.add({
+              targets: [dad, bubble],
+              alpha: 0,
+              duration: 180,
+              ease: "Sine.easeIn",
+              onComplete: () => {
+                dad.destroy();
+                bubble.destroy();
+              },
+            });
+          });
         }
       }
     );
@@ -814,7 +901,8 @@ export default class ParallaxScene extends Phaser.Scene {
       laneStartX: this.laneStartX,
       stepSizePx: this.stepSizePx,
       maxX: this.camCtl.getMaxXPadding(40),
-      duration: 850,
+      // גם התזוזה לאחור (עונש) קצת יותר איטית
+      duration: 1300,
       ease: "Sine.easeInOut",
       onComplete: () => {
         console.log("[CLIENT][ParallaxScene] playPenaltyMove onComplete", {

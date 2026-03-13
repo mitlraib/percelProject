@@ -102,7 +102,7 @@ export class DuoRoom extends Room {
       this.broadcastPlayersMeta();
     });
   
-    // ✅ זה מה שהיה חסר
+    // משימה נפתחה אצל שחקן – משדרים לכולם כדי להציג "X עוזר לי כרגע" אצל השאר
     this.onMessage("taskStarted", (client: Client, msg: any) => {
       const idx = this.players.indexOf(client.sessionId);
   
@@ -123,7 +123,9 @@ export class DuoRoom extends Room {
         return;
       }
   
-      const type = msg?.type === "noam" ? "noam" : "mom";
+      const rawType = msg?.type;
+      const type: "mom" | "noam" | "dad" =
+        rawType === "noam" ? "noam" : rawType === "dad" ? "dad" : "mom";
   
       console.log("[SERVER][DuoRoom] broadcasting taskStarted", {
         roomId: this.roomId,

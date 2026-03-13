@@ -78,6 +78,13 @@ export default class ParallaxTaskFlowController {
     this.seatingTriggered.add(triggerKey);
     this.opts.lockForTask();
 
+    // מודיעים לשרת שהמשימה של אבא נפתחה אצל השחקן הזה
+    if (net) {
+      try {
+        net.sendTaskStarted("dad");
+      } catch {}
+    }
+
     this.seatingTask = new WeddingSeatingTask(this.scene, {
       depth: 7000,
       durationSec: 60,

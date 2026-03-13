@@ -18,7 +18,8 @@ type MovePayload = { playerIndex: number; value: number };
 type PenaltyMovePayload = { playerIndex: number; deltaSteps: number };
 type RollDeniedPayload = { reason?: string; currentTurn?: number };
 type PlayersMetaPayload = { names?: (string | null)[]; avatars?: (string | null)[] };
-type TaskStartedPayload = { type: "mom" | "noam"; playerIndex: number };
+type TaskType = "mom" | "noam" | "dad";
+type TaskStartedPayload = { type: TaskType; playerIndex: number };
 
 export default class NetGameController extends Phaser.Events.EventEmitter {
   private room: Room;
@@ -215,13 +216,25 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
   }
 
   sendPlayerMeta(name?: string, avatar?: string) {
+    const safeAvatar =
+      avatar && avatar.length > 120_000
+        ? undefined
+        : avatar;
+
     console.log("[CLIENT] sendPlayerMeta", {
       name,
-      hasAvatar: !!avatar,
-      avatarLength: avatar?.length ?? null,
+      hasAvatar: !!safeAvatar,
+      avatarLength: safeAvatar?.length ?? null,
       ts: Date.now(),
     });
-    this.room.send("playerMeta", { name, avatar });
+
+    this.room.send("playerMeta", { name, avatar: safeAvatar });
+
+    // אחרי עדכון שם/תמונה, נבקש גם סנכרון מלא מהשרת
+    // כדי לוודא שהסטייט (ready / turn וכו') מתיישר לכולם.
+    try {
+      this.requestSync();
+    } catch {}
   }
 
   requestSync() {
@@ -229,7 +242,7 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
     this.room.send("sync");
   }
 
-  sendTaskStarted(type: "mom" | "noam") {
+  sendTaskStarted(type: TaskType) {
     console.log("[CLIENT] sendTaskStarted", {
       type,
       myIndex: this.myIndex,

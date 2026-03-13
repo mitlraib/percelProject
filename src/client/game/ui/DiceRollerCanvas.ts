@@ -181,11 +181,17 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
     const value = Phaser.Math.Between(1, 6);
     this.lastRoll = value;
 
+    // שולחים את האירוע בלבד – מי שמאזין (ParallaxScene) יחליט על הערך הסופי
+    // ויקרא ל-playVisualRoll(finalValue) כך שהקובייה תסתיים על המספר הנכון.
     this.emit("roll", { value } satisfies RollEvent);
-    this.dice.playVisualRoll(value, 300);
   }
 
-  async roll(durationMs = 300): Promise<number> {
+  /** מאפשר לסצנות להפעיל אנימציה עבור ערך סופי ידוע (כולל רצף קבוע לילדה). */
+  playVisualRoll(finalValue: number, durationMs = 600) {
+    this.dice.playVisualRoll(finalValue, durationMs);
+  }
+
+  async roll(durationMs = 600): Promise<number> {
     if (this.disabled) return this.lastRoll || this.dice.getValue();
     if (!this.visibleFlag) return this.lastRoll || this.dice.getValue();
     if (!this.dice.visible) return this.lastRoll || this.dice.getValue();
@@ -198,7 +204,7 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
     return value;
   }
 
-  async rollForced(durationMs = 300): Promise<number> {
+  async rollForced(durationMs = 600): Promise<number> {
     if (this.dice.isRolling()) return this.lastRoll || this.dice.getValue();
 
     const value = Phaser.Math.Between(1, 6);

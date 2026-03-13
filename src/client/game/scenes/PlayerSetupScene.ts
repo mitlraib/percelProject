@@ -124,8 +124,8 @@ export default class PlayerSetupScene extends Phaser.Scene {
     const file = this.fileInput.files?.[0];
     if (file) {
       // תמונה גדולה מדי גורמת לבעיות ברשת (Max payload size exceeded).
-      // נגביל לגודל סביר ונמשיך בלי תמונה אם חורג.
-      const MAX_BYTES = 150 * 1024; // ~150KB
+      // נגביל לגודל קטן יותר ונמשיך בלי תמונה אם חורג.
+      const MAX_BYTES = 60 * 1024; // ~60KB
       if (file.size > MAX_BYTES) {
         alert("התמונה שבחרת גדולה מדי. נשתמש בלי תמונה כדי שהמשחק ירוץ חלק.");
         this.registry.remove(REGISTRY_AVATAR_DATA_URL);
