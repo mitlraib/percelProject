@@ -46,12 +46,16 @@ export default class CleanupPuzzle {
     this.scene = scene;
     this.onComplete = opts.onComplete;
 
-    // ✅ כדי שלא “יתפס” משהו מאחור
+    console.log("[PUZZLE] ctor", {
+      ts: Date.now(),
+      depth: opts.depth ?? 25000,
+      hasOnComplete: !!opts.onComplete,
+    });
+
     this.scene.input.topOnly = true;
 
     const depth = opts.depth ?? 25000;
 
-    // root UI container
     this.root = scene.add.container(scene.scale.width / 2, scene.scale.height / 2);
     this.root.setDepth(depth);
     this.root.setScrollFactor(0);
@@ -60,6 +64,8 @@ export default class CleanupPuzzle {
   }
 
   private build() {
+    console.log("[PUZZLE] build start", { ts: Date.now() });
+
     const gridW = this.grid * this.slotSize + (this.grid - 1) * this.slotGap;
     const gridH = gridW;
 
@@ -72,14 +78,12 @@ export default class CleanupPuzzle {
     const panelW = gridW + panelPadX * 2;
     const panelH = gridH + panelBottomPad + panelTopPad;
 
-    // ✅ overlay כהה (לא אינטראקטיבי)
     const overlay = this.scene.add
       .rectangle(0, 0, this.scene.scale.width, this.scene.scale.height, 0x000000, 0.55)
       .setOrigin(0.5)
       .setScrollFactor(0);
     overlay.disableInteractive();
 
-    // ✅ פאנל
     const panelBg = this.scene.add.graphics().setScrollFactor(0);
     panelBg.fillStyle(0xffffff, 1);
     panelBg.lineStyle(3, 0x111111, 0.9);
@@ -95,10 +99,8 @@ export default class CleanupPuzzle {
       .setOrigin(0, 0)
       .setScrollFactor(0);
 
-    // ❌ אין X
     this.root.add([overlay, panelBg, title]);
 
-    // ✅ slots (בפנים) — לא אינטראקטיביים
     this.slots = [];
     for (let cell = 0; cell < 9; cell++) {
       const id = cell;
@@ -110,9 +112,13 @@ export default class CleanupPuzzle {
       this.root.add(slot.container);
     }
 
-    // --- tiles בחוץ (בצדדים: שמאל + ימין) ---
     const ids = [...Array(9)].map((_, i) => i);
     this.shuffle(ids);
+
+    console.log("[PUZZLE] shuffled ids", {
+      ids,
+      ts: Date.now(),
+    });
 
     this.tiles = [];
     this.homePos.clear();
@@ -143,6 +149,13 @@ export default class CleanupPuzzle {
         this.tiles.push(tile);
         this.homePos.set(tileId, { x, y });
         this.root.add(tile);
+
+        console.log("[PUZZLE] tile placed at home", {
+          tileId,
+          x,
+          y,
+          ts: Date.now(),
+        });
       });
     };
 
@@ -151,8 +164,11 @@ export default class CleanupPuzzle {
 
     this.root.bringToTop(title);
 
-    // ✅ אם את רוצה לבדוק האם בכלל מגיע קליק לפאזל:
-    // this.scene.input.on("gameobjectdown", (_p, go) => console.log("down:", go.name));
+    console.log("[PUZZLE] build end", {
+      slots: this.slots.length,
+      tiles: this.tiles.length,
+      ts: Date.now(),
+    });
   }
 
   private createSlot(id: number, x: number, y: number): Slot {
@@ -181,10 +197,10 @@ export default class CleanupPuzzle {
       .setScrollFactor(0);
 
     c.add([bg, shadowIcon, shadowLabel]);
+
     return { id, x, y, occupied: false, container: c };
   }
 
-  // ✅ Drag יציב: ה-Zone הוא האינטראקטיבי, והוא מזיז את ה-Container
   private createTile(tileId: number) {
     const c = this.scene.add.container(0, 0).setScrollFactor(0);
     c.name = `tile-${tileId}`;
@@ -211,14 +227,26 @@ export default class CleanupPuzzle {
     (c as any).__tileId = tileId;
 
     hitZone.on("pointerdown", () => {
+      console.log("[PUZZLE] pointerdown tile", {
+        tileId,
+        x: c.x,
+        y: c.y,
+        ts: Date.now(),
+      });
       c.setDepth(999999);
       this.root.bringToTop(c);
     });
 
     hitZone.on("dragstart", (pointer: Phaser.Input.Pointer) => {
+      console.log("[PUZZLE] dragstart", {
+        tileId,
+        pointerX: pointer.x,
+        pointerY: pointer.y,
+        ts: Date.now(),
+      });
+
       this.scene.tweens.killTweensOf(c);
 
-      // ✅ offset שלא יקפוץ
       const tileScreenX = this.root.x + c.x;
       const tileScreenY = this.root.y + c.y;
       (c as any).__dragOffX = pointer.x - tileScreenX;
@@ -231,7 +259,6 @@ export default class CleanupPuzzle {
       const offX = (c as any).__dragOffX ?? 0;
       const offY = (c as any).__dragOffY ?? 0;
 
-      // ✅ קואורדינטות מסך (כי זה UI)
       const px = Phaser.Math.Clamp(pointer.x, 0, this.scene.scale.width);
       const py = Phaser.Math.Clamp(pointer.y, 0, this.scene.scale.height);
 
@@ -240,18 +267,37 @@ export default class CleanupPuzzle {
     });
 
     hitZone.on("dragend", () => {
-      this.scene.tweens.add({ targets: c, scale: 1, duration: 80, ease: "Sine.easeInOut" });
-
       const id = (c as any).__tileId as number;
       const slot = this.findBestSlotFor(c.x, c.y);
 
+      console.log("[PUZZLE] dragend", {
+        tileId: id,
+        tileX: c.x,
+        tileY: c.y,
+        foundSlotId: slot?.id ?? null,
+        foundSlotOccupied: slot?.occupied ?? null,
+        ts: Date.now(),
+      });
+
+      this.scene.tweens.add({ targets: c, scale: 1, duration: 80, ease: "Sine.easeInOut" });
+
       if (!slot || slot.occupied) {
+        console.log("[PUZZLE] dragend -> return home (no slot / occupied)", {
+          tileId: id,
+          ts: Date.now(),
+        });
         this.returnToHome(id);
         c.setDepth(1);
         return;
       }
 
       if (slot.id === id) {
+        console.log("[PUZZLE] dragend -> correct slot", {
+          tileId: id,
+          slotId: slot.id,
+          ts: Date.now(),
+        });
+
         slot.occupied = true;
         this.snapToSlot(c, slot.x, slot.y);
 
@@ -259,8 +305,18 @@ export default class CleanupPuzzle {
         c.setDepth(10);
 
         this.placedCount++;
+        console.log("[PUZZLE] placedCount", {
+          placedCount: this.placedCount,
+          ts: Date.now(),
+        });
+
         if (this.placedCount === 9) this.win();
       } else {
+        console.log("[PUZZLE] dragend -> wrong slot, return home", {
+          tileId: id,
+          slotId: slot.id,
+          ts: Date.now(),
+        });
         this.returnToHome(id);
         c.setDepth(1);
       }
@@ -270,6 +326,13 @@ export default class CleanupPuzzle {
   }
 
   private snapToSlot(tile: Phaser.GameObjects.Container, x: number, y: number) {
+    console.log("[PUZZLE] snapToSlot", {
+      tileId: (tile as any).__tileId,
+      x,
+      y,
+      ts: Date.now(),
+    });
+
     this.scene.tweens.add({
       targets: tile,
       x,
@@ -286,6 +349,13 @@ export default class CleanupPuzzle {
 
     const home = this.homePos.get(tileId);
     if (!home) return;
+
+    console.log("[PUZZLE] returnToHome", {
+      tileId,
+      x: home.x,
+      y: home.y,
+      ts: Date.now(),
+    });
 
     this.scene.tweens.add({
       targets: tile,
@@ -317,8 +387,12 @@ export default class CleanupPuzzle {
   }
 
   private win() {
+    console.log("[PUZZLE] win", {
+      ts: Date.now(),
+    });
+
     const msg = this.scene.add
-      .text(0, this.grid * (this.slotSize + this.slotGap) / 2 + 30, "אלופה! הבית מסודר 🎉", {
+      .text(0, (this.grid * (this.slotSize + this.slotGap)) / 2 + 30, "אלופה! הבית מסודר 🎉", {
         fontFamily: "Arial",
         fontSize: "22px",
         color: "#111",
@@ -336,7 +410,9 @@ export default class CleanupPuzzle {
       repeat: 2,
       ease: "Sine.easeInOut",
       onComplete: () => {
+        console.log("[PUZZLE] win tween complete", { ts: Date.now() });
         this.scene.time.delayedCall(350, () => {
+          console.log("[PUZZLE] calling onComplete", { ts: Date.now() });
           this.onComplete?.();
           this.destroy();
         });
@@ -366,6 +442,11 @@ export default class CleanupPuzzle {
   }
 
   destroy() {
+    console.log("[PUZZLE] destroy", {
+      ts: Date.now(),
+      tiles: this.tiles.length,
+      slots: this.slots.length,
+    });
     this.root.destroy(true);
   }
 }

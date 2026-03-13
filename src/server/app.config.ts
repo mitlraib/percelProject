@@ -1,46 +1,60 @@
-  import {defineServer, defineRoom, monitor, playground, createRouter, createEndpoint,} from "colyseus";
-  import type { Request, Response, NextFunction } from "express";
-  import { MyRoom } from "./rooms/MyRoom.js";
+import {
+  defineServer,
+  defineRoom,
+  monitor,
+  playground,
+  createRouter,
+  createEndpoint,
+} from "colyseus";
+import { WebSocketTransport } from "@colyseus/ws-transport";
+import type { Request, Response, NextFunction } from "express";
+import { MyRoom } from "./rooms/MyRoom.js";
 import { DuoRoom } from "./rooms/DuoRoom.js";
-  
 
-  const server = defineServer({
-    rooms: {
-      my_room: defineRoom(MyRoom),
-      duo_room: defineRoom(DuoRoom),
-    },
+const server = defineServer({
+  // מגדירים transport עם pingInterval / pingMaxRetries גדולים יותר,
+  // כדי שטאבים ברקע / מכשירים איטיים לא יתנתקו באמצע משימת אמא / הפאזל
+  transport: new WebSocketTransport({
+    pingInterval: 8000, // כל 8 שניות
+    pingMaxRetries: 10, // עד ~80 שניות בלי פינג לפני ניתוק
+  }),
 
-    routes: createRouter({
-      api_hello: createEndpoint("/api/hello", { method: "GET" }, async () => {
-        return { message: "Hello World" };
-      }),
+  rooms: {
+    my_room: defineRoom(MyRoom),
+    duo_room: defineRoom(DuoRoom),
+  },
+
+  routes: createRouter({
+    api_hello: createEndpoint("/api/hello", { method: "GET" }, async () => {
+      return { message: "Hello World" };
     }),
+  }),
 
-    express: (app) => {
-      // מאפשרים גישה מהדומיין של הקליינט (Render) – CORS פשוט לכל המקורות
-      app.use((req: Request, res: Response, next: NextFunction) => {
-        res.header("Access-Control-Allow-Origin", "*");
-        res.header(
-          "Access-Control-Allow-Headers",
-          "Origin, X-Requested-With, Content-Type, Accept"
-        );
-        res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-        if (req.method === "OPTIONS") {
-          res.sendStatus(200);
-          return;
-        }
-        next();
-      });
-      app.get("/hi", (req: Request, res: Response) => {
-        res.send("It's time to kick ass and chew bubblegum!");
-      });
-
-      app.use("/colyseus", monitor());
-
-      if (process.env.NODE_ENV !== "production") {
-        app.use("/", playground());
+  express: (app) => {
+    // מאפשרים גישה מהדומיין של הקליינט (Render) – CORS פשוט לכל המקורות
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header(
+        "Access-Control-Allow-Headers",
+        "Origin, X-Requested-With, Content-Type, Accept"
+      );
+      res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+      if (req.method === "OPTIONS") {
+        res.sendStatus(200);
+        return;
       }
-    },
-  });
+      next();
+    });
+    app.get("/hi", (req: Request, res: Response) => {
+      res.send("It's time to kick ass and chew bubblegum!");
+    });
 
-  export default server;
+    app.use("/colyseus", monitor());
+
+    if (process.env.NODE_ENV !== "production") {
+      app.use("/", playground());
+    }
+  },
+});
+
+export default server;

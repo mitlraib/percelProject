@@ -20,7 +20,7 @@ export class DuoRoom extends Room {
       roomId: this.roomId,
       createdAt: new Date().toISOString(),
     });
-
+  
     this.onMessage("sync", (client: Client) => {
       console.log("[SERVER][DuoRoom] sync received", {
         roomId: this.roomId,
@@ -30,13 +30,13 @@ export class DuoRoom extends Room {
         currentTurn: this.currentTurn,
         ready: this.ready,
       });
-
+  
       this.sendAllStateTo(client);
     });
-
+  
     this.onMessage("penalty", (client: Client, msg: any) => {
       const idx = this.players.indexOf(client.sessionId);
-
+  
       console.log("[SERVER][DuoRoom] penalty received", {
         roomId: this.roomId,
         sessionId: client.sessionId,
@@ -44,40 +44,27 @@ export class DuoRoom extends Room {
         rawMsg: msg,
         at: Date.now(),
       });
-
-      if (idx === -1) {
-        console.log("[SERVER][DuoRoom] penalty ignored - client not found", {
-          roomId: this.roomId,
-          sessionId: client.sessionId,
-        });
-        return;
-      }
-
+  
+      if (idx === -1) return;
+  
       const raw = Number(msg?.deltaSteps);
-      if (!Number.isFinite(raw)) {
-        console.log("[SERVER][DuoRoom] penalty ignored - bad deltaSteps", {
-          roomId: this.roomId,
-          sessionId: client.sessionId,
-          raw,
-        });
-        return;
-      }
-
+      if (!Number.isFinite(raw)) return;
+  
       const deltaSteps = Math.max(-10, Math.min(-1, Math.floor(raw)));
-
+  
       console.log("[SERVER][DuoRoom] broadcasting penaltyMove", {
         roomId: this.roomId,
         playerIndex: idx,
         deltaSteps,
         at: Date.now(),
       });
-
+  
       this.broadcast("penaltyMove", { playerIndex: idx, deltaSteps });
     });
-
+  
     this.onMessage("playerMeta", (client: Client, msg: any) => {
       const idx = this.players.indexOf(client.sessionId);
-
+  
       console.log("[SERVER][DuoRoom] playerMeta received", {
         roomId: this.roomId,
         sessionId: client.sessionId,
@@ -90,26 +77,20 @@ export class DuoRoom extends Room {
           typeof msg?.avatar === "string" ? msg.avatar.length : null,
         at: Date.now(),
       });
-
-      if (idx === -1) {
-        console.log("[SERVER][DuoRoom] playerMeta ignored - client not found", {
-          roomId: this.roomId,
-          sessionId: client.sessionId,
-        });
-        return;
-      }
-
+  
+      if (idx === -1) return;
+  
       const nameRaw = typeof msg?.name === "string" ? msg.name : undefined;
       const avatarRaw = typeof msg?.avatar === "string" ? msg.avatar : undefined;
-
+  
       const name = nameRaw ? nameRaw.slice(0, 24) : undefined;
       const avatar =
         avatarRaw && avatarRaw.startsWith("data:image") && avatarRaw.length < 200_000
           ? avatarRaw
           : undefined;
-
+  
       this.metas[idx] = { name, avatar };
-
+  
       console.log("[SERVER][DuoRoom] playerMeta saved", {
         roomId: this.roomId,
         idx,
@@ -117,10 +98,43 @@ export class DuoRoom extends Room {
         hasAvatar: !!avatar,
         at: Date.now(),
       });
-
+  
       this.broadcastPlayersMeta();
     });
-
+  
+    // ✅ זה מה שהיה חסר
+    this.onMessage("taskStarted", (client: Client, msg: any) => {
+      const idx = this.players.indexOf(client.sessionId);
+  
+      console.log("[SERVER][DuoRoom] taskStarted received", {
+        roomId: this.roomId,
+        sessionId: client.sessionId,
+        idx,
+        rawMsg: msg,
+        at: Date.now(),
+      });
+  
+      if (idx === -1) {
+        console.log("[SERVER][DuoRoom] taskStarted ignored - client not found", {
+          roomId: this.roomId,
+          sessionId: client.sessionId,
+          at: Date.now(),
+        });
+        return;
+      }
+  
+      const type = msg?.type === "noam" ? "noam" : "mom";
+  
+      console.log("[SERVER][DuoRoom] broadcasting taskStarted", {
+        roomId: this.roomId,
+        playerIndex: idx,
+        type,
+        at: Date.now(),
+      });
+  
+      this.broadcast("taskStarted", { type, playerIndex: idx });
+    });
+  
     this.onMessage("roll", (client: Client, msg: any) => {
       console.log("[SERVER][DuoRoom] roll received", {
         roomId: this.roomId,
@@ -131,74 +145,49 @@ export class DuoRoom extends Room {
         currentTurn: this.currentTurn,
         players: [...this.players],
       });
-
+  
       if (!this.ready) {
-        console.log("[SERVER][DuoRoom] roll denied - room not ready", {
-          roomId: this.roomId,
-          sessionId: client.sessionId,
-          at: Date.now(),
-        });
         client.send("rollDenied", { reason: "not_ready" });
         return;
       }
-
+  
       const idx = this.players.indexOf(client.sessionId);
-      if (idx === -1) {
-        console.log("[SERVER][DuoRoom] roll ignored - client not assigned", {
-          roomId: this.roomId,
-          sessionId: client.sessionId,
-          at: Date.now(),
-        });
-        return;
-      }
-
+      if (idx === -1) return;
+  
       if (idx !== this.currentTurn) {
-        console.log("[SERVER][DuoRoom] roll denied - not your turn", {
-          roomId: this.roomId,
-          sessionId: client.sessionId,
-          idx,
-          currentTurn: this.currentTurn,
-          at: Date.now(),
-        });
         client.send("rollDenied", {
           reason: "not_your_turn",
           currentTurn: this.currentTurn,
         });
         return;
       }
-
+  
       const raw = Number(msg?.value);
       if (!Number.isFinite(raw)) {
-        console.log("[SERVER][DuoRoom] roll denied - bad value", {
-          roomId: this.roomId,
-          sessionId: client.sessionId,
-          rawValue: msg?.value,
-          at: Date.now(),
-        });
         client.send("rollDenied", { reason: "bad_value" });
         return;
       }
-
+  
       const value = Math.max(1, Math.min(6, Math.floor(raw)));
-
+  
       console.log("[SERVER][DuoRoom] roll accepted", {
         roomId: this.roomId,
         playerIndex: idx,
         value,
         at: Date.now(),
       });
-
+  
       const move: MovePayload = { playerIndex: idx, value };
-
+  
       console.log("[SERVER][DuoRoom] broadcasting move", {
         roomId: this.roomId,
         move,
         at: Date.now(),
       });
       this.broadcast("move", move);
-
+  
       this.currentTurn = this.currentTurn === 0 ? 1 : 0;
-
+  
       console.log("[SERVER][DuoRoom] broadcasting next turn", {
         roomId: this.roomId,
         nextTurn: this.currentTurn,

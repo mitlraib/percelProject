@@ -44,6 +44,25 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
       playerCount,
     });
 
+    this.room.onLeave((code) => {
+      console.log("[CLIENT] room.onLeave", {
+        code,
+        roomId: (this.room as any)?.roomId,
+        sessionId: (this.room as any)?.sessionId,
+        ts: Date.now(),
+      });
+    });
+
+    this.room.onError((code, message) => {
+      console.log("[CLIENT] room.onError", {
+        code,
+        message,
+        roomId: (this.room as any)?.roomId,
+        sessionId: (this.room as any)?.sessionId,
+        ts: Date.now(),
+      });
+    });
+
     room.onMessage("players", (p: PlayersPayload) => {
       this.playersCount = p.count;
       this.recomputeCanRoll();
@@ -163,7 +182,6 @@ export default class NetGameController extends Phaser.Events.EventEmitter {
       this.emit("taskStarted", p);
     });
 
-    // sync אחד בלבד בתחילת החיבור
     console.log("[CLIENT] sending initial sync", { ts: Date.now() });
     this.room.send("sync");
   }

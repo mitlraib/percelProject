@@ -43,8 +43,12 @@ export default class ParallaxScene extends Phaser.Scene {
 
   private currentTurnName = "";
   private myPlayerIndex: number | null = null;
-  /** האם המשחק כבר היה במצב ready פעם אחת (כלומר משחק רץ) */
+
+  /** האם המשחק כבר היה במצב ready פעם אחת */
   private netWasReady = false;
+
+  /** כדי לא לחזור כמה פעמים לתפריט */
+  private leavingToMenu = false;
 
   private laneStartX = 0;
   private stepSizePx = 0;
@@ -95,6 +99,23 @@ export default class ParallaxScene extends Phaser.Scene {
 
   create() {
     console.log("[CLIENT][ParallaxScene] create start", { ts: Date.now() });
+
+    window.addEventListener("error", (e) => {
+      console.log("[CLIENT] window error", {
+        message: e.message,
+        filename: e.filename,
+        lineno: e.lineno,
+        colno: e.colno,
+        ts: Date.now(),
+      });
+    });
+
+    window.addEventListener("unhandledrejection", (e) => {
+      console.log("[CLIENT] unhandledrejection", {
+        reason: String(e.reason),
+        ts: Date.now(),
+      });
+    });
 
     this.cursors = this.input.keyboard!.createCursorKeys();
 
@@ -421,11 +442,10 @@ export default class ParallaxScene extends Phaser.Scene {
           myIndex: this.myPlayerIndex,
           currentTurn: s.currentTurn,
           netWasReady: this.netWasReady,
+          leavingToMenu: this.leavingToMenu,
           ts: Date.now(),
         });
 
-        // אם המשחק כבר היה במצב ready (שתי שחקניות) ועכשיו ready=false → מישהי התנתקה באמצע משחק.
-        // נחזיר בעדינות לתפריט, במקום להשאיר מחכה לנצח.
         if (this.netWasReady) {
           this.ui.setDicePlayer("מחכה לשחקניות…", "⏳");
           this.ui.setDiceDisabled(true);
@@ -433,16 +453,18 @@ export default class ParallaxScene extends Phaser.Scene {
           this.currentTurnName = "שחקנית התנתקה – חוזרים לתפריט";
           this.refreshHUD();
 
-          this.time.delayedCall(1800, () => {
-            console.log("[CLIENT] other player disconnected → back to menu", {
-              ts: Date.now(),
+          if (!this.leavingToMenu) {
+            this.leavingToMenu = true;
+            this.time.delayedCall(1800, () => {
+              console.log("[CLIENT] other player disconnected → back to menu", {
+                ts: Date.now(),
+              });
+              this.scene.start("menu-scene");
             });
-            this.scene.start("menu-scene");
-          });
+          }
           return;
         }
 
-        // לפני שהמשחק התחיל (עדיין מחכים לשחקנים)
         this.ui.setDicePlayer("מחכה לשחקנים…", "⏳");
         this.ui.setDiceDisabled(true);
         this.ui.setDiceVisibleDeferred(false);
@@ -469,7 +491,6 @@ export default class ParallaxScene extends Phaser.Scene {
         this.waitingSyncTimer = null;
       }
 
-      // סימון שהמשחק כבר היה מוכן – אם אחר כך ready=false נדע שמישהי התנתקה
       this.netWasReady = true;
 
       if (s.myIndex !== null && s.myIndex !== undefined) {
@@ -730,6 +751,12 @@ export default class ParallaxScene extends Phaser.Scene {
         this.ui.setMoving(false);
 
         const stepsNow = this.players.getSteps(playerIndex);
+
+        console.log("[CLIENT][ParallaxScene] before tasks.handleAfterMove", {
+          playerIndex,
+          stepsNow,
+          ts: Date.now(),
+        });
 
         this.tasks.handleAfterMove(playerIndex, stepsNow, () => {
           console.log("[CLIENT][ParallaxScene] tasks.handleAfterMove done", {

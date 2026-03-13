@@ -143,6 +143,11 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
   }
 
   private refreshInteractivity() {
+    // אם הסצנה/אזור כבר הושמדו (למשל בזמן מעבר סצנה) – לא ננסה לגעת באינטראקציה
+    if (!this.hitZone || !(this.hitZone as any).scene || !(this.scene as any).sys) {
+      return;
+    }
+
     const shouldBeInteractive = this.visibleFlag && !this.disabled;
 
     console.log("[CLIENT][DiceRollerCanvas] refreshInteractivity", {
