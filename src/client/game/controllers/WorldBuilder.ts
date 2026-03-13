@@ -26,6 +26,21 @@ export default class WorldBuilder {
     this.scene = scene;
   }
 
+  private isMobileDevice(): boolean {
+    const device = this.scene.sys.game.device;
+    return !!(device.os.android || device.os.iOS);
+  }
+
+  private getDefaultGroundOffsetY(): number {
+    const h = this.scene.scale.height;
+
+    if (this.isMobileDevice()) {
+      return Math.round(h * 0.07);
+    }
+
+    return Math.round(h * 0.15);
+  }
+
   build(opts: {
     totalWidth: number;
     brideKey: string;
@@ -34,14 +49,12 @@ export default class WorldBuilder {
     this.destroy();
 
     this.totalWidth = opts.totalWidth;
-    this.groundOffsetY =
-      opts.groundOffsetY ?? Math.round(this.scene.scale.height * 0.15);
+    this.groundOffsetY = opts.groundOffsetY ?? this.getDefaultGroundOffsetY();
     this.brideKey = opts.brideKey;
 
     const { width, height } = this.scene.scale;
     const groundY = height - this.groundOffsetY;
 
-    // Sky: full viewport, behind everything
     this.sky = this.scene.add
       .image(0, 0, "sky")
       .setOrigin(0, 0)
@@ -49,7 +62,6 @@ export default class WorldBuilder {
       .setDepth(-1000);
     this.sky.setDisplaySize(width, height);
 
-    // Plateau: anchored at ground line, height scales with viewport
     const plateauHeight = Math.max(height * 0.55, 220);
     const plateau = this.buildRepeatedLayer({
       texture: "plateau",
@@ -62,7 +74,6 @@ export default class WorldBuilder {
     });
     this.plateauLayer = plateau.sprites;
 
-    // Ground: path band + extended down to bottom so no purple sky shows under the path
     const groundPathHeight = Math.max(height * 0.18, 80);
     const groundFullHeight = groundPathHeight + (height - groundY);
     const ground = this.buildRepeatedLayer({
@@ -76,8 +87,6 @@ export default class WorldBuilder {
     });
     this.groundLayer = ground.sprites;
 
-    // Plants (foreground): bottom-most natural layer — must cover from ground line to bottom so no sky shows
-    // Height = distance from ground line to bottom + overlap so there is no gap at any aspect ratio
     const plantsHeight = this.getPlantsTargetHeight(height, groundY);
     const plants = this.buildRepeatedLayer({
       texture: "plants",
@@ -90,7 +99,6 @@ export default class WorldBuilder {
     });
     this.plantsLayer = plants.sprites;
 
-    // Bride sign (UI, fixed to screen)
     this.brideSign = this.scene.add
       .image(width * 0.03, height * 0.06, this.brideKey)
       .setOrigin(0, 0)
@@ -115,14 +123,12 @@ export default class WorldBuilder {
     return { groundY };
   }
 
-  /**
-   * Plants must always cover from (ground line) to (bottom of screen) so purple sky never shows.
-   * Use a generous height so rounding or texture transparency can't leave a strip at the bottom.
-   */
   private getPlantsTargetHeight(viewHeight: number, groundY: number): number {
     const fromGroundToBottom = viewHeight - groundY;
     const overlap = Math.max(150, viewHeight * 0.22);
-    return Math.ceil(Math.max(fromGroundToBottom + overlap, viewHeight * 0.32, 200));
+    return Math.ceil(
+      Math.max(fromGroundToBottom + overlap, viewHeight * 0.32, 200)
+    );
   }
 
   resize(opts: {
@@ -133,9 +139,13 @@ export default class WorldBuilder {
     if (typeof opts.totalWidth === "number") {
       this.totalWidth = opts.totalWidth;
     }
+
     if (typeof opts.groundOffsetY === "number") {
       this.groundOffsetY = opts.groundOffsetY;
+    } else {
+      this.groundOffsetY = this.getDefaultGroundOffsetY();
     }
+
     if (typeof opts.brideKey === "string") {
       this.brideKey = opts.brideKey;
     }
