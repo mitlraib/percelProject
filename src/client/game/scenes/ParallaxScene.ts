@@ -51,7 +51,8 @@ export default class ParallaxScene extends Phaser.Scene {
   private laneOffsets: number[] = [];
   private playerTargetHeight = 70;
 
-  private readonly MOVE_MS = 2000;
+  // מהירות תזוזה של השחקנים (מילישניות)
+  private readonly MOVE_MS = 900;
 
   private readonly fixedDiceSeqPlayer0 = [5, 2, 3, 5, 6, 6];
   private fixedDiceSeqIndex0 = 0;

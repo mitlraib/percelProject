@@ -81,8 +81,9 @@ export default class WeddingSeatingGuestsController {
         .zone(x, y, cardW, cardH)
         .setScrollFactor(0)
         .setDepth(this.opts.depth + 1)
+        .setSize(cardW, cardH)
         .setInteractive(
-          new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH),
+          new Phaser.Geom.Rectangle(0, 0, cardW, cardH),
           Phaser.Geom.Rectangle.Contains
         );
 
