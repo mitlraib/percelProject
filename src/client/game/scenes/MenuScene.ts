@@ -1,5 +1,3 @@
-//src\client\game\scenes\MenuScene.ts
-
 import Phaser from "phaser";
 
 type PlayerOption = {
@@ -13,7 +11,7 @@ const PLAYER_OPTIONS: PlayerOption[] = [
   { count: 1, label: "בדד אלך", desc: "זה רק אני והבוט שנגדי", emoji: "👰" },
   { count: 2, label: "שתיים זה תמיד ביחד", desc: "רק אני והבסטי", emoji: "⚔️" },
   { count: 3, label: "שלוש חברות", desc: "אני ושתי חברות", emoji: "🏰" },
-  { count: 4, label: "אללה פארטי", desc: " ארבע בנות עושות פה קומונה", emoji: "🎪" },
+  { count: 4, label: "אללה פארטי", desc: "ארבע בנות עושות פה קומונה", emoji: "🎪" },
 ];
 
 export default class MenuScene extends Phaser.Scene {
@@ -35,42 +33,55 @@ export default class MenuScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
+    const isMobile = !!(this.sys.game.device.os.android || this.sys.game.device.os.iOS);
+    const isPortrait = height > width;
 
-    // Background
     this.add.rectangle(width / 2, height / 2, width, height, 0x0b0b14).setDepth(0);
 
-    // Title
+    const titleY = isMobile ? 56 : 90;
+    const titleSize = isMobile ? (isPortrait ? 34 : 42) : 54;
+    const subTitleY = titleY + (isMobile ? 42 : 55);
+    const subTitleSize = isMobile ? 16 : 18;
+
     this.add
-      .text(width / 2, 90, "✨ המסע לחתונה ✨", {
+      .text(width / 2, titleY, "✨ המסע לחתונה ✨", {
         fontFamily: "Arial",
-        fontSize: "54px",
+        fontSize: `${titleSize}px`,
         fontStyle: "bold",
         color: "#ff66cc",
+        rtl: true,
+        align: "center",
       })
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, 145, "הדרך לחתונה רצופה בכוונות טובות", {
+      .text(width / 2, subTitleY, "הדרך לחתונה רצופה בכוונות טובות", {
         fontFamily: "Arial",
-        fontSize: "18px",
+        fontSize: `${subTitleSize}px`,
         color: "#66ccff",
+        rtl: true,
+        align: "center",
       })
       .setOrigin(0.5);
 
-    // Grid layout
-    const cols = 2;
-    const cardW = Math.min(320, Math.floor(width * 0.42));
-    const cardH = 140;
-    const gap = 18;
+    const cols = isMobile && isPortrait ? 1 : 2;
+    const horizontalPadding = isMobile ? 20 : 0;
+    const gap = isMobile ? 14 : 18;
+    const cardW =
+      cols === 1
+        ? Math.min(420, width - horizontalPadding * 2)
+        : Math.min(320, Math.floor(width * 0.42));
+    const cardH = isMobile ? 120 : 140;
 
     const gridW = cols * cardW + (cols - 1) * gap;
     const startX = width / 2 - gridW / 2;
-    const startY = 220;
+    const startY = isMobile ? (isPortrait ? 150 : 170) : 220;
 
     const startGame = (count: number) => {
       const mode: "solo" | "local" = count === 1 ? "solo" : "local";
       this.registry.set("playerCount", count);
       this.registry.set("mode", mode);
+
       if (count > 1) {
         this.scene.start("player-setup-scene", { mode, playerCount: count });
       } else {
@@ -90,27 +101,30 @@ export default class MenuScene extends Phaser.Scene {
         .setStrokeStyle(2, 0x2a2a44, 1);
 
       const emoji = this.add
-        .text(-cardW / 2 + 26, -cardH / 2 + 18, opt.emoji, {
+        .text(-cardW / 2 + 18, -cardH / 2 + 16, opt.emoji, {
           fontFamily: "Arial",
-          fontSize: "32px",
+          fontSize: isMobile ? "28px" : "32px",
           color: "#ffffff",
         })
         .setOrigin(0, 0);
 
       const label = this.add
-        .text(-cardW / 2 + 80, -cardH / 2 + 18, opt.label, {
+        .text(-cardW / 2 + 68, -cardH / 2 + 18, opt.label, {
           fontFamily: "Arial",
-          fontSize: "18px",
+          fontSize: isMobile ? "17px" : "18px",
           fontStyle: "bold",
           color: "#ffffff",
+          rtl: true,
         })
         .setOrigin(0, 0);
 
       const desc = this.add
-        .text(-cardW / 2 + 80, -cardH / 2 + 48, opt.desc, {
+        .text(-cardW / 2 + 68, -cardH / 2 + 48, opt.desc, {
           fontFamily: "Arial",
-          fontSize: "14px",
+          fontSize: isMobile ? "13px" : "14px",
           color: "#b7b7c9",
+          wordWrap: { width: cardW - 90 },
+          rtl: true,
         })
         .setOrigin(0, 0);
 
@@ -134,10 +148,12 @@ export default class MenuScene extends Phaser.Scene {
 
       container.on("pointerdown", () => {
         this.setSelected(opt.count);
+      });
+
+      container.on("pointerup", () => {
         startGame(opt.count);
       });
 
-      // entrance tween
       container.setAlpha(0);
       container.y += 20;
       this.tweens.add({
@@ -152,9 +168,9 @@ export default class MenuScene extends Phaser.Scene {
       this.optionButtons.push({ opt, container, bg });
     });
 
-    // Start button
-    const btnW = Math.min(420, Math.floor(width * 0.7));
-    const btnH = 64;
+    const btnW =
+      cols === 1 ? Math.min(420, width - horizontalPadding * 2) : Math.min(420, Math.floor(width * 0.7));
+    const btnH = isMobile ? 58 : 64;
 
     this.startBg = this.add
       .rectangle(0, 0, btnW, btnH, 0x2a2a44, 1)
@@ -163,13 +179,16 @@ export default class MenuScene extends Phaser.Scene {
     this.startLabel = this.add
       .text(0, 0, "🎲 Start Adventure!", {
         fontFamily: "Arial",
-        fontSize: "22px",
+        fontSize: isMobile ? "20px" : "22px",
         fontStyle: "bold",
         color: "#9a9ab3",
       })
       .setOrigin(0.5);
 
-    this.startBtn = this.add.container(width / 2, startY + 2 * (cardH + gap) + 90, [
+    const rowsCount = Math.ceil(PLAYER_OPTIONS.length / cols);
+    const btnY = startY + rowsCount * (cardH + gap) + (isMobile ? 34 : 48);
+
+    this.startBtn = this.add.container(width / 2, btnY, [
       this.startBg,
       this.startLabel,
     ]);

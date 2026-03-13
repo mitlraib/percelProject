@@ -14,8 +14,15 @@ import SoloVsBotMatch from "../match/SoloVsBotMatch";
 import ParallaxLayoutManager from "./parallax/ParallaxLayoutManager";
 import ParallaxHudController from "./parallax/ParallaxHudController";
 import ParallaxTaskFlowController from "./parallax/ParallaxTaskFlowController";
-import type { ExtendedNetStateView, LayoutMetrics, Mode } from "./parallax/ParallaxTypes";
-import { REGISTRY_DISPLAY_NAME, REGISTRY_AVATAR_DATA_URL } from "./PlayerSetupScene";
+import type {
+  ExtendedNetStateView,
+  LayoutMetrics,
+  Mode,
+} from "./parallax/ParallaxTypes";
+import {
+  REGISTRY_DISPLAY_NAME,
+  REGISTRY_AVATAR_DATA_URL,
+} from "./PlayerSetupScene";
 
 export default class ParallaxScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -57,6 +64,9 @@ export default class ParallaxScene extends Phaser.Scene {
   private laneOffsets: number[] = [];
   private playerTargetHeight = 70;
 
+  private rotateOverlay?: Phaser.GameObjects.Container;
+  private isGameBlockedForPortrait = false;
+
   // מהירות תנועת השחקנים קדימה – מעט יותר איטית
   private readonly MOVE_MS = 1350;
 
@@ -86,19 +96,58 @@ export default class ParallaxScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image("sky", new URL("../../assets/sky.png", import.meta.url).toString());
-    this.load.image("plateau", new URL("../../assets/plateau.png", import.meta.url).toString());
-    this.load.image("ground", new URL("../../assets/ground.png", import.meta.url).toString());
-    this.load.image("plants", new URL("../../assets/plant.png", import.meta.url).toString());
-    this.load.image("bride", new URL("../../assets/brideNeon.png", import.meta.url).toString());
+    this.load.image(
+      "sky",
+      new URL("../../assets/sky.png", import.meta.url).toString()
+    );
+    this.load.image(
+      "plateau",
+      new URL("../../assets/plateau.png", import.meta.url).toString()
+    );
+    this.load.image(
+      "ground",
+      new URL("../../assets/ground.png", import.meta.url).toString()
+    );
+    this.load.image(
+      "plants",
+      new URL("../../assets/plant.png", import.meta.url).toString()
+    );
+    this.load.image(
+      "bride",
+      new URL("../../assets/brideNeon.png", import.meta.url).toString()
+    );
 
-    this.load.image("ילדה", new URL("../../assets/ילדה.png", import.meta.url).toString());
-    this.load.image("כלב", new URL("../../assets/כלב.png", import.meta.url).toString());
-    this.load.image("דוב", new URL("../../assets/דוב.png", import.meta.url).toString());
+    this.load.image(
+      "ילדה",
+      new URL("../../assets/ילדה.png", import.meta.url).toString()
+    );
+    this.load.image(
+      "כלב",
+      new URL("../../assets/כלב.png", import.meta.url).toString()
+    );
+    this.load.image(
+      "דוב",
+      new URL("../../assets/דוב.png", import.meta.url).toString()
+    );
 
-    this.load.image("MOM", new URL("../../assets/MOM.png", import.meta.url).toString());
-    this.load.image("dad", new URL("../../assets/dad.png", import.meta.url).toString());
-    this.load.image("NOAM", new URL("../../assets/NOAM.png", import.meta.url).toString());
+    this.load.image(
+      "MOM",
+      new URL("../../assets/MOM.png", import.meta.url).toString()
+    );
+    this.load.image(
+      "dad",
+      new URL("../../assets/dad.png", import.meta.url).toString()
+    );
+    this.load.image(
+      "NOAM",
+      new URL("../../assets/NOAM.png", import.meta.url).toString()
+    );
+
+    // דמות מיוחדת עבור השם "קלי"
+    this.load.image(
+      "KALI",
+      new URL("../../assets/KALI.png", import.meta.url).toString()
+    );
   }
 
   create() {
@@ -254,6 +303,7 @@ export default class ParallaxScene extends Phaser.Scene {
         ts: Date.now(),
       });
 
+      if (this.isGameBlockedForPortrait) return;
       if (this.tasks.isLocked()) return;
       if (this.noamTasks.isLocked()) return;
       if (this.taskFlow.hasActiveSeatingTask()) return;
@@ -278,6 +328,7 @@ export default class ParallaxScene extends Phaser.Scene {
         myIndex: this.getMyIndex(),
       });
 
+      if (this.isGameBlockedForPortrait) return;
       if (this.tasks.isLocked() || this.noamTasks.isLocked()) return;
       if (this.taskFlow.hasActiveSeatingTask()) return;
 
@@ -297,9 +348,7 @@ export default class ParallaxScene extends Phaser.Scene {
         if (this.getMyIndex() === null) return;
         if (!this.net.canRollNow()) return;
 
-        // מפעילים את האנימציה עם הערך הסופי (כולל הרצף הקבוע לילדה) – איטית יותר
         this.ui.dice.playVisualRoll(finalValue, 600);
-
         this.ui.setDiceVisibleDeferred(true);
 
         console.log("[CLIENT] sending roll to server", {
@@ -317,9 +366,109 @@ export default class ParallaxScene extends Phaser.Scene {
     });
 
     this.refreshHUD();
+    this.createRotateOverlay();
+    this.refreshRotateOverlay();
+
     this.scale.on("resize", this.handleResize, this);
 
     console.log("[CLIENT][ParallaxScene] create end", { ts: Date.now() });
+  }
+
+  private isMobileDevice(): boolean {
+    const device = this.sys.game.device;
+    return !!(device.os.android || device.os.iOS);
+  }
+
+  private shouldBlockForPortrait(width: number, height: number): boolean {
+    return this.isMobileDevice() && height > width;
+  }
+
+  private createRotateOverlay() {
+    const { width, height } = this.scale;
+
+    const bg = this.add
+      .rectangle(0, 0, width, height, 0x05050c, 0.94)
+      .setOrigin(0, 0)
+      .setScrollFactor(0);
+
+    const icon = this.add
+      .text(width / 2, height / 2 - 110, "📱↺", {
+        fontFamily: "Arial",
+        fontSize: `${Math.max(40, Math.min(width * 0.12, 68))}px`,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
+    const title = this.add
+      .text(width / 2, height / 2 - 40, "סובבי את המכשיר", {
+        fontFamily: "Arial",
+        fontSize: `${Math.max(26, Math.min(width * 0.07, 40))}px`,
+        fontStyle: "bold",
+        color: "#ff66cc",
+        align: "center",
+        rtl: true,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
+    const subtitle = this.add
+      .text(width / 2, height / 2 + 20, "כדי לשחק, צריך מצב אופקי", {
+        fontFamily: "Arial",
+        fontSize: `${Math.max(16, Math.min(width * 0.04, 24))}px`,
+        color: "#ffffff",
+        align: "center",
+        rtl: true,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
+    this.rotateOverlay = this.add
+      .container(0, 0, [bg, icon, title, subtitle])
+      .setDepth(200000)
+      .setScrollFactor(0);
+
+    this.rotateOverlay.setVisible(false);
+  }
+
+  private refreshRotateOverlay() {
+    const { width, height } = this.scale;
+    const shouldBlock = this.shouldBlockForPortrait(width, height);
+
+    this.isGameBlockedForPortrait = shouldBlock;
+
+    if (!this.rotateOverlay) return;
+
+    const bg = this.rotateOverlay.list[0] as Phaser.GameObjects.Rectangle;
+    const icon = this.rotateOverlay.list[1] as Phaser.GameObjects.Text;
+    const title = this.rotateOverlay.list[2] as Phaser.GameObjects.Text;
+    const subtitle = this.rotateOverlay.list[3] as Phaser.GameObjects.Text;
+
+    bg.setPosition(0, 0);
+    bg.setSize(width, height);
+
+    icon.setPosition(width / 2, height / 2 - 110);
+    title.setPosition(width / 2, height / 2 - 40);
+    subtitle.setPosition(width / 2, height / 2 + 20);
+
+    icon.setFontSize(Math.max(40, Math.min(width * 0.12, 68)));
+    title.setFontSize(Math.max(26, Math.min(width * 0.07, 40)));
+    subtitle.setFontSize(Math.max(16, Math.min(width * 0.04, 24)));
+
+    this.rotateOverlay.setVisible(shouldBlock);
+
+    if (shouldBlock) {
+      this.ui?.setDiceDisabled(true);
+      this.ui?.setDiceVisibleDeferred(false);
+    } else {
+      if (
+        !this.tasks?.isLocked?.() &&
+        !this.noamTasks?.isLocked?.() &&
+        !this.taskFlow?.hasActiveSeatingTask?.()
+      ) {
+        this.unlockAfterTask();
+      }
+      this.refreshHUD();
+    }
   }
 
   private applyLayoutValues(layout: LayoutMetrics) {
@@ -368,6 +517,8 @@ export default class ParallaxScene extends Phaser.Scene {
     this.time.delayedCall(50, () => {
       this.camCtl?.follow(this.players?.getContainer(followIdx));
     });
+
+    this.refreshRotateOverlay();
   }
 
   private attachNetOrSolo() {
@@ -388,7 +539,9 @@ export default class ParallaxScene extends Phaser.Scene {
     }
 
     const room = this.registry.get("room") as Room | undefined;
-    const existingNet = this.registry.get("net") as NetGameController | undefined;
+    const existingNet = this.registry.get("net") as
+      | NetGameController
+      | undefined;
 
     console.log("[CLIENT][ParallaxScene] registry room/net", {
       hasRoom: !!room,
@@ -424,10 +577,13 @@ export default class ParallaxScene extends Phaser.Scene {
     this.room = room;
     this.net = existingNet ?? new NetGameController(room, this.playerCount);
 
-    const displayName = this.registry.get(REGISTRY_DISPLAY_NAME) as string | undefined;
-    const avatarDataUrl = this.registry.get(REGISTRY_AVATAR_DATA_URL) as string | undefined;
+    const displayName = this.registry.get(REGISTRY_DISPLAY_NAME) as
+      | string
+      | undefined;
+    const avatarDataUrl = this.registry.get(REGISTRY_AVATAR_DATA_URL) as
+      | string
+      | undefined;
 
-    // נשמור את תמונת האווטאר המקומית לשימוש בצד הקליינט בלבד
     this.localAvatarDataUrl = avatarDataUrl ?? null;
 
     if (displayName || avatarDataUrl) {
@@ -525,7 +681,11 @@ export default class ParallaxScene extends Phaser.Scene {
       try {
         const avatars = s.avatars ?? [];
         avatars.forEach((dataUrl, idx) => {
-          if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image")) {
+          if (
+            !dataUrl ||
+            typeof dataUrl !== "string" ||
+            !dataUrl.startsWith("data:image")
+          ) {
             return;
           }
 
@@ -540,7 +700,6 @@ export default class ParallaxScene extends Phaser.Scene {
           }
         });
 
-        // אם אין אווטאר מהשרת עבורי ויש לי תמונה מקומית – נשתמש בה רק אצל הקליינט שלי
         if (
           me !== null &&
           this.localAvatarDataUrl &&
@@ -550,12 +709,22 @@ export default class ParallaxScene extends Phaser.Scene {
           const localKey = `player-local-avatar-${me}`;
           if (!this.textures.exists(localKey)) {
             this.textures.once("addtexture", (texKey: string) => {
-              if (texKey === localKey) this.players?.setPlayerTexture(me, localKey);
+              if (texKey === localKey)
+                this.players?.setPlayerTexture(me, localKey);
             });
             this.textures.addBase64(localKey, this.localAvatarDataUrl);
           } else {
             this.players?.setPlayerTexture(me, localKey);
           }
+        }
+
+        // אם יש שחקנית בשם "קלי" – נשתמש בטקסטורה המיוחדת KALI בשבילה
+        if (this.textures.exists("KALI")) {
+          names.forEach((n, idx) => {
+            if (typeof n === "string" && n.trim() === "קלי") {
+              this.players?.setPlayerTexture(idx, "KALI");
+            }
+          });
         }
       } catch {}
 
@@ -602,13 +771,17 @@ export default class ParallaxScene extends Phaser.Scene {
       if (me !== null) {
         this.camCtl.follow(this.players.getContainer(me));
       }
+
+      this.refreshRotateOverlay();
     };
 
     this.net.on("state", applyNetState);
     applyNetState(this.net.getState());
 
     this.time.delayedCall(400, () => {
-      console.log("[CLIENT] delayed requestSync after attachNet", { ts: Date.now() });
+      console.log("[CLIENT] delayed requestSync after attachNet", {
+        ts: Date.now(),
+      });
       this.net?.requestSync?.();
     });
 
@@ -617,10 +790,14 @@ export default class ParallaxScene extends Phaser.Scene {
       ({ playerIndex, value }: { playerIndex: number; value: number }) => {
         const now = Date.now();
         if (this.lastRollClickTs !== null) {
-          console.log("[CLIENT] latency click→move(ms)", now - this.lastRollClickTs, {
-            playerIndex,
-            value,
-          });
+          console.log(
+            "[CLIENT] latency click→move(ms)",
+            now - this.lastRollClickTs,
+            {
+              playerIndex,
+              value,
+            }
+          );
         }
 
         console.log("[CLIENT][ParallaxScene] net move listener", {
@@ -653,7 +830,13 @@ export default class ParallaxScene extends Phaser.Scene {
 
     this.net.on(
       "taskStarted",
-      ({ type, playerIndex }: { type: "mom" | "noam" | "dad"; playerIndex: number }) => {
+      ({
+        type,
+        playerIndex,
+      }: {
+        type: "mom" | "noam" | "dad";
+        playerIndex: number;
+      }) => {
         console.log("[CLIENT][ParallaxScene] net taskStarted listener", {
           type,
           playerIndex,
@@ -679,7 +862,6 @@ export default class ParallaxScene extends Phaser.Scene {
         } else if (type === "noam") {
           this.noamTasks.showBusyMessage(name);
         } else {
-          // משימת אבא – מציגים אבא עם בועת דיבור לשאר השחקנים
           const { width, height } = this.scale;
           const dadKey = this.textures.exists("DAD")
             ? "DAD"
@@ -724,14 +906,19 @@ export default class ParallaxScene extends Phaser.Scene {
             .setStrokeStyle(2, 0x4b2e2e);
 
           const label = this.add
-            .text(0, 0, `${name} עוזר/ת לי כרגע לסדר את השולחנות... מיד יתפנה אליכן.`, {
-              fontFamily: "Arial",
-              fontSize: "18px",
-              color: "#3a1f1f",
-              align: "center",
-              wordWrap: { width: bubbleWidth - 30 },
-              rtl: true,
-            })
+            .text(
+              0,
+              0,
+              `${name} עוזר/ת לי כרגע לסדר את השולחנות... מיד יתפנה אליכן.`,
+              {
+                fontFamily: "Arial",
+                fontSize: "18px",
+                color: "#3a1f1f",
+                align: "center",
+                wordWrap: { width: bubbleWidth - 30 },
+                rtl: true,
+              }
+            )
             .setOrigin(0.5);
 
           const bubble = this.add
@@ -780,7 +967,11 @@ export default class ParallaxScene extends Phaser.Scene {
       this.myPlayerIndex
     );
     const fromNet = this.net?.getState?.().names;
-    if (fromNet && fromNet[playerIndex] != null && fromNet[playerIndex] !== "") {
+    if (
+      fromNet &&
+      fromNet[playerIndex] != null &&
+      fromNet[playerIndex] !== ""
+    ) {
       return fromNet[playerIndex] ?? fallback[playerIndex] ?? "שחקן";
     }
     return fallback[playerIndex] ?? "שחקן";
@@ -877,31 +1068,38 @@ export default class ParallaxScene extends Phaser.Scene {
             ts: Date.now(),
           });
 
-          this.taskFlow.handleWeddingSeatingAfterMove(playerIndex, stepsNow, () => {
-            console.log("[CLIENT][ParallaxScene] taskFlow.handleWeddingSeatingAfterMove done", {
-              playerIndex,
-              stepsNow,
-              ts: Date.now(),
-            });
-
-            this.noamTasks.handleAfterMove(playerIndex, stepsNow, () => {
-              console.log("[CLIENT][ParallaxScene] noamTasks.handleAfterMove done", {
-                playerIndex,
-                stepsNow,
-                ts: Date.now(),
-              });
-
-              const followIdx = this.getMyIndex() ?? 0;
-
-              this.refreshHUD();
-              this.time.delayedCall(100, () =>
-                this.camCtl.follow(this.players.getContainer(followIdx))
+          this.taskFlow.handleWeddingSeatingAfterMove(
+            playerIndex,
+            stepsNow,
+            () => {
+              console.log(
+                "[CLIENT][ParallaxScene] taskFlow.handleWeddingSeatingAfterMove done",
+                {
+                  playerIndex,
+                  stepsNow,
+                  ts: Date.now(),
+                }
               );
 
-              this.ui.flushPendingDiceVisibility();
-              onTurnFinished?.();
-            });
-          });
+              this.noamTasks.handleAfterMove(playerIndex, stepsNow, () => {
+                console.log("[CLIENT][ParallaxScene] noamTasks.handleAfterMove done", {
+                  playerIndex,
+                  stepsNow,
+                  ts: Date.now(),
+                });
+
+                const followIdx = this.getMyIndex() ?? 0;
+
+                this.refreshHUD();
+                this.time.delayedCall(100, () =>
+                  this.camCtl.follow(this.players.getContainer(followIdx))
+                );
+
+                this.ui.flushPendingDiceVisibility();
+                onTurnFinished?.();
+              });
+            }
+          );
         });
       },
     });
@@ -926,7 +1124,6 @@ export default class ParallaxScene extends Phaser.Scene {
       laneStartX: this.laneStartX,
       stepSizePx: this.stepSizePx,
       maxX: this.camCtl.getMaxXPadding(40),
-      // גם התזוזה לאחור (עונש) קצת יותר איטית
       duration: 1300,
       ease: "Sine.easeInOut",
       onComplete: () => {
@@ -966,6 +1163,12 @@ export default class ParallaxScene extends Phaser.Scene {
       myIndex: this.getMyIndex(),
       ts: Date.now(),
     });
+
+    if (this.isGameBlockedForPortrait) {
+      this.ui.setDiceDisabled(true);
+      this.ui.setDiceVisibleDeferred(false);
+      return;
+    }
 
     if (this.mode === "solo") {
       this.soloMatch?.setPaused(false);
@@ -1049,6 +1252,9 @@ export default class ParallaxScene extends Phaser.Scene {
     this.tasks?.destroy();
     this.noamTasks?.destroy();
 
+    this.rotateOverlay?.destroy();
+    this.rotateOverlay = undefined;
+
     this.world?.destroy();
     this.players?.destroy();
     this.momCtl?.destroy();
@@ -1056,6 +1262,10 @@ export default class ParallaxScene extends Phaser.Scene {
   }
 
   update() {
+    if (this.isGameBlockedForPortrait) {
+      return;
+    }
+
     if (
       this.tasks?.isLocked() ||
       this.noamTasks?.isLocked() ||

@@ -4,14 +4,7 @@ import type { LayoutMetrics } from "./ParallaxTypes";
 export default class ParallaxLayoutManager {
   compute(width: number, height: number): LayoutMetrics {
     const safeWidth = Math.max(width, 320);
-
-    // במכשירים גבוהים מאוד (נייד אנכי) נקטין את גובה הלייאאוט,
-    // כדי שלא תתקבל תחושה של "מסך צר וארוך". נוסיף יותר "שמיים" מעל.
-    const aspect = height / Math.max(width, 1);
-    const maxLayoutHeight =
-      aspect > 1.5 ? Math.min(height, safeWidth * 1.4) : height;
-
-    const safeHeight = Math.max(maxLayoutHeight, 480);
+    const safeHeight = Math.max(height, 480);
 
     const laneStartX = Math.round(safeWidth * 0.1);
     const stepSizePx = Math.round(
@@ -24,16 +17,14 @@ export default class ParallaxLayoutManager {
 
     const groundOffsetY = Math.round(safeHeight * 0.15);
 
+    // גובה השחקנים – עוד יותר גדול, אבל עדיין פרופורציונלי למסך
     const playerTargetHeight = Math.round(
-      Math.max(48, Math.min(safeHeight * 0.12, safeWidth * 0.15))
+      Math.max(72, Math.min(safeHeight * 0.20, safeWidth * 0.24))
     );
 
-    const laneOffsets = [
-      0,
-      Math.round(playerTargetHeight * 0.65),
-      Math.round(playerTargetHeight * 1.3),
-      Math.round(playerTargetHeight * 1.95),
-    ];
+    // כל הדמויות על אותו קו גובה, אבל קצת מעל הקרקע (מעל הסלעים)
+    const baseOffset = Math.round(playerTargetHeight * 0.6);
+    const laneOffsets = [baseOffset, baseOffset, baseOffset, baseOffset];
 
     const diceSize = Math.round(
       Math.max(58, Math.min(safeWidth, safeHeight) * 0.12)
