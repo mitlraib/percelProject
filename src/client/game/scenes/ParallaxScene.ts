@@ -43,6 +43,8 @@ export default class ParallaxScene extends Phaser.Scene {
 
   private currentTurnName = "";
   private myPlayerIndex: number | null = null;
+  /** האם המשחק כבר היה במצב ready פעם אחת (כלומר משחק רץ) */
+  private netWasReady = false;
 
   private laneStartX = 0;
   private stepSizePx = 0;
@@ -51,14 +53,13 @@ export default class ParallaxScene extends Phaser.Scene {
   private laneOffsets: number[] = [];
   private playerTargetHeight = 70;
 
-  // מהירות תזוזה של השחקנים (מילישניות)
   private readonly MOVE_MS = 900;
 
   private readonly fixedDiceSeqPlayer0 = [5, 2, 3, 5, 6, 6];
   private fixedDiceSeqIndex0 = 0;
 
-  /** טיימר לסנכרון תקופתי כשמחכים לשחקנים – כדי לתפוס ready אם ה-broadcast לא הגיע */
   private waitingSyncTimer: Phaser.Time.TimerEvent | null = null;
+  private lastRollClickTs: number | null = null;
 
   constructor() {
     super("parallax-scene");
@@ -68,6 +69,12 @@ export default class ParallaxScene extends Phaser.Scene {
     this.mode = data.mode ?? (this.registry.get("mode") as Mode) ?? "local";
     this.playerCount =
       data.playerCount ?? (this.registry.get("playerCount") as number) ?? 1;
+
+    console.log("[CLIENT][ParallaxScene] init", {
+      mode: this.mode,
+      playerCount: this.playerCount,
+      ts: Date.now(),
+    });
   }
 
   preload() {
@@ -87,6 +94,8 @@ export default class ParallaxScene extends Phaser.Scene {
   }
 
   create() {
+    console.log("[CLIENT][ParallaxScene] create start", { ts: Date.now() });
+
     this.cursors = this.input.keyboard!.createCursorKeys();
 
     const layout = this.layoutMgr.compute(this.scale.width, this.scale.height);
@@ -156,6 +165,13 @@ export default class ParallaxScene extends Phaser.Scene {
       lock: () => this.lockForTask(),
       unlock: () => this.unlockAfterTask(),
       onFailPenalty: (playerIndex, deltaSteps, done) => {
+        console.log("[CLIENT][ParallaxScene] onFailPenalty", {
+          playerIndex,
+          deltaSteps,
+          hasNet: !!this.net,
+          ts: Date.now(),
+        });
+
         if (!this.net) {
           this.playPenaltyMove(playerIndex, deltaSteps, done);
           return;
@@ -176,11 +192,21 @@ export default class ParallaxScene extends Phaser.Scene {
       followMyPlayer: (delay = 80) => {
         this.time.delayedCall(delay, () => {
           const followIdx = this.getMyIndex() ?? 0;
+          console.log("[CLIENT][ParallaxScene] followMyPlayer", {
+            followIdx,
+            delay,
+            ts: Date.now(),
+          });
           this.camCtl.follow(this.players.getContainer(followIdx));
         });
       },
       showSmallStatus: (message) => this.hudCtl.showSmallStatus(message),
       onPenaltyLocal: (playerIndex, deltaSteps, done) => {
+        console.log("[CLIENT][ParallaxScene] onPenaltyLocal", {
+          playerIndex,
+          deltaSteps,
+          ts: Date.now(),
+        });
         this.playPenaltyMove(playerIndex, deltaSteps, done);
       },
       onRefreshHud: () => this.refreshHUD(),
@@ -193,6 +219,16 @@ export default class ParallaxScene extends Phaser.Scene {
     );
 
     spaceKey?.on("down", () => {
+      console.log("[CLIENT][ParallaxScene] SPACE pressed", {
+        tasksLocked: this.tasks.isLocked(),
+        noamLocked: this.noamTasks.isLocked(),
+        seatingActive: this.taskFlow.hasActiveSeatingTask(),
+        diceDisabled: this.ui.isDiceDisabled(),
+        myIndex: this.getMyIndex(),
+        canRollNow: this.net?.canRollNow?.(),
+        ts: Date.now(),
+      });
+
       if (this.tasks.isLocked()) return;
       if (this.noamTasks.isLocked()) return;
       if (this.taskFlow.hasActiveSeatingTask()) return;
@@ -207,6 +243,16 @@ export default class ParallaxScene extends Phaser.Scene {
     });
 
     this.ui.dice.onRoll(({ value }) => {
+      const now = Date.now();
+      this.lastRollClickTs = now;
+
+      console.log("[CLIENT] roll clicked", {
+        value,
+        ts: now,
+        mode: this.mode,
+        myIndex: this.getMyIndex(),
+      });
+
       if (this.tasks.isLocked() || this.noamTasks.isLocked()) return;
       if (this.taskFlow.hasActiveSeatingTask()) return;
 
@@ -227,6 +273,14 @@ export default class ParallaxScene extends Phaser.Scene {
         if (!this.net.canRollNow()) return;
 
         this.ui.setDiceVisibleDeferred(true);
+
+        console.log("[CLIENT] sending roll to server", {
+          value: finalValue,
+          myIndex: this.getMyIndex(),
+          canRollNow: this.net.canRollNow(),
+          ts: Date.now(),
+        });
+
         this.net.sendRoll(finalValue);
         return;
       }
@@ -236,6 +290,8 @@ export default class ParallaxScene extends Phaser.Scene {
 
     this.refreshHUD();
     this.scale.on("resize", this.handleResize, this);
+
+    console.log("[CLIENT][ParallaxScene] create end", { ts: Date.now() });
   }
 
   private applyLayoutValues(layout: LayoutMetrics) {
@@ -247,6 +303,12 @@ export default class ParallaxScene extends Phaser.Scene {
   }
 
   private handleResize(gameSize: Phaser.Structs.Size) {
+    console.log("[CLIENT][ParallaxScene] handleResize", {
+      width: gameSize.width,
+      height: gameSize.height,
+      ts: Date.now(),
+    });
+
     const layout = this.layoutMgr.compute(gameSize.width, gameSize.height);
     this.applyLayoutValues(layout);
 
@@ -281,6 +343,12 @@ export default class ParallaxScene extends Phaser.Scene {
   }
 
   private attachNetOrSolo() {
+    console.log("[CLIENT][ParallaxScene] attachNetOrSolo", {
+      mode: this.mode,
+      playerCount: this.playerCount,
+      ts: Date.now(),
+    });
+
     if (this.mode === "solo") {
       this.attachSolo();
       return;
@@ -294,10 +362,21 @@ export default class ParallaxScene extends Phaser.Scene {
     const room = this.registry.get("room") as Room | undefined;
     const existingNet = this.registry.get("net") as NetGameController | undefined;
 
+    console.log("[CLIENT][ParallaxScene] registry room/net", {
+      hasRoom: !!room,
+      hasExistingNet: !!existingNet,
+      ts: Date.now(),
+    });
+
     if (!room) {
       this.game.events.once("room-ready", () => {
         const r = this.registry.get("room") as Room | undefined;
         const net = this.registry.get("net") as NetGameController | undefined;
+        console.log("[CLIENT][ParallaxScene] room-ready event", {
+          hasRoom: !!r,
+          hasNet: !!net,
+          ts: Date.now(),
+        });
         if (r) this.attachNet(r, net);
       });
       return;
@@ -307,11 +386,19 @@ export default class ParallaxScene extends Phaser.Scene {
   }
 
   private attachNet(room: Room, existingNet?: NetGameController) {
+    console.log("[CLIENT][ParallaxScene] attachNet", {
+      hasExistingNet: !!existingNet,
+      roomId: (room as any)?.roomId,
+      sessionId: (room as any)?.sessionId,
+      ts: Date.now(),
+    });
+
     this.room = room;
     this.net = existingNet ?? new NetGameController(room, this.playerCount);
 
     const displayName = this.registry.get(REGISTRY_DISPLAY_NAME) as string | undefined;
     const avatarDataUrl = this.registry.get(REGISTRY_AVATAR_DATA_URL) as string | undefined;
+
     if (displayName || avatarDataUrl) {
       this.net.sendPlayerMeta(displayName, avatarDataUrl);
     }
@@ -319,16 +406,58 @@ export default class ParallaxScene extends Phaser.Scene {
     const applyNetState = (rawState: NetStateView) => {
       const s = rawState as ExtendedNetStateView;
 
+      console.log("[CLIENT] applyNetState", {
+        myIndexBefore: this.myPlayerIndex,
+        stateMyIndex: s.myIndex,
+        currentTurn: s.currentTurn,
+        canRollNow: s.canRollNow,
+        ready: s.ready,
+        names: s.names,
+        ts: Date.now(),
+      });
+
       if (!s.ready) {
+        console.log("[CLIENT] applyNetState => not ready", {
+          myIndex: this.myPlayerIndex,
+          currentTurn: s.currentTurn,
+          netWasReady: this.netWasReady,
+          ts: Date.now(),
+        });
+
+        // אם המשחק כבר היה במצב ready (שתי שחקניות) ועכשיו ready=false → מישהי התנתקה באמצע משחק.
+        // נחזיר בעדינות לתפריט, במקום להשאיר מחכה לנצח.
+        if (this.netWasReady) {
+          this.ui.setDicePlayer("מחכה לשחקניות…", "⏳");
+          this.ui.setDiceDisabled(true);
+          this.ui.setDiceVisibleDeferred(false);
+          this.currentTurnName = "שחקנית התנתקה – חוזרים לתפריט";
+          this.refreshHUD();
+
+          this.time.delayedCall(1800, () => {
+            console.log("[CLIENT] other player disconnected → back to menu", {
+              ts: Date.now(),
+            });
+            this.scene.start("menu-scene");
+          });
+          return;
+        }
+
+        // לפני שהמשחק התחיל (עדיין מחכים לשחקנים)
         this.ui.setDicePlayer("מחכה לשחקנים…", "⏳");
         this.ui.setDiceDisabled(true);
         this.ui.setDiceVisibleDeferred(false);
         this.currentTurnName = "מחכה לשחקנים…";
         this.refreshHUD();
+
         if (!this.waitingSyncTimer && this.net) {
           this.waitingSyncTimer = this.time.addEvent({
             delay: 1500,
-            callback: () => this.net?.requestSync?.(),
+            callback: () => {
+              console.log("[CLIENT] waitingSyncTimer requestSync", {
+                ts: Date.now(),
+              });
+              this.net?.requestSync?.();
+            },
             loop: true,
           });
         }
@@ -339,6 +468,9 @@ export default class ParallaxScene extends Phaser.Scene {
         this.waitingSyncTimer.destroy();
         this.waitingSyncTimer = null;
       }
+
+      // סימון שהמשחק כבר היה מוכן – אם אחר כך ready=false נדע שמישהי התנתקה
+      this.netWasReady = true;
 
       if (s.myIndex !== null && s.myIndex !== undefined) {
         this.myPlayerIndex = s.myIndex;
@@ -374,14 +506,25 @@ export default class ParallaxScene extends Phaser.Scene {
             this.players?.setPlayerTexture(idx, key);
           }
         });
-      } catch {
-        // no-op
-      }
+      } catch {}
 
       const me = this.getMyIndex();
       const myIdxForUI = me ?? 0;
       const myName = names[myIdxForUI] ?? "שחקן";
       const myEmoji = emojis[myIdxForUI] ?? "🎮";
+
+      console.log("[CLIENT] ui player/canRoll decision", {
+        me,
+        myIdxForUI,
+        myName,
+        currentTurn: s.currentTurn,
+        canRollNow: s.canRollNow,
+        tasksLocked: this.tasks.isLocked(),
+        noamLocked: this.noamTasks.isLocked(),
+        seatingActive: this.taskFlow.hasActiveSeatingTask(),
+        ts: Date.now(),
+      });
+
       this.ui.setDicePlayer(myName, myEmoji);
 
       if (me === null) {
@@ -399,6 +542,13 @@ export default class ParallaxScene extends Phaser.Scene {
       this.currentTurnName = names[s.currentTurn] ?? "";
       this.refreshHUD();
 
+      console.log("[CLIENT] applyNetState => after UI update", {
+        me,
+        currentTurnName: this.currentTurnName,
+        diceDisabled: this.ui.isDiceDisabled(),
+        ts: Date.now(),
+      });
+
       if (me !== null) {
         this.camCtl.follow(this.players.getContainer(me));
       }
@@ -406,11 +556,29 @@ export default class ParallaxScene extends Phaser.Scene {
 
     this.net.on("state", applyNetState);
     applyNetState(this.net.getState());
-    this.time.delayedCall(400, () => this.net?.requestSync?.());
+
+    this.time.delayedCall(400, () => {
+      console.log("[CLIENT] delayed requestSync after attachNet", { ts: Date.now() });
+      this.net?.requestSync?.();
+    });
 
     this.net.on(
       "move",
       ({ playerIndex, value }: { playerIndex: number; value: number }) => {
+        const now = Date.now();
+        if (this.lastRollClickTs !== null) {
+          console.log("[CLIENT] latency click→move(ms)", now - this.lastRollClickTs, {
+            playerIndex,
+            value,
+          });
+        }
+
+        console.log("[CLIENT][ParallaxScene] net move listener", {
+          playerIndex,
+          value,
+          ts: now,
+        });
+
         this.playMoveTurn(playerIndex, value);
       }
     );
@@ -424,6 +592,11 @@ export default class ParallaxScene extends Phaser.Scene {
         playerIndex: number;
         deltaSteps: number;
       }) => {
+        console.log("[CLIENT][ParallaxScene] net penaltyMove listener", {
+          playerIndex,
+          deltaSteps,
+          ts: Date.now(),
+        });
         this.playPenaltyMove(playerIndex, deltaSteps);
       }
     );
@@ -431,6 +604,13 @@ export default class ParallaxScene extends Phaser.Scene {
     this.net.on(
       "taskStarted",
       ({ type, playerIndex }: { type: "mom" | "noam"; playerIndex: number }) => {
+        console.log("[CLIENT][ParallaxScene] net taskStarted listener", {
+          type,
+          playerIndex,
+          myIndex: this.getMyIndex(),
+          ts: Date.now(),
+        });
+
         const me = this.getMyIndex();
         if (me !== null && playerIndex === me) return;
 
@@ -474,6 +654,8 @@ export default class ParallaxScene extends Phaser.Scene {
   }
 
   private attachSolo() {
+    console.log("[CLIENT][ParallaxScene] attachSolo", { ts: Date.now() });
+
     this.soloMatch = new SoloVsBotMatch(this, this.ui.dice as never, {
       name: "מיטול",
       emoji: "👰‍♀️",
@@ -482,6 +664,12 @@ export default class ParallaxScene extends Phaser.Scene {
     this.soloMatch.on(
       "turn-changed",
       (e: { player: { isBot: boolean; name: string } }) => {
+        console.log("[CLIENT][ParallaxScene] solo turn-changed", {
+          isBot: e.player.isBot,
+          name: e.player.name,
+          ts: Date.now(),
+        });
+
         this.soloIsBotTurn = e.player.isBot;
         this.currentTurnName = e.player.name;
 
@@ -495,6 +683,12 @@ export default class ParallaxScene extends Phaser.Scene {
     this.soloMatch.on(
       "dice-rolled",
       (e: { player: { name: string }; value: number }) => {
+        console.log("[CLIENT][ParallaxScene] solo dice-rolled", {
+          playerName: e.player.name,
+          value: e.value,
+          ts: Date.now(),
+        });
+
         const idx = e.player.name === "מיטול" ? 0 : 1;
         this.playMoveTurn(idx, e.value, () => this.soloMatch?.advanceTurn());
       }
@@ -508,6 +702,13 @@ export default class ParallaxScene extends Phaser.Scene {
     diceValue: number,
     onTurnFinished?: () => void
   ) {
+    console.log("[CLIENT][ParallaxScene] playMoveTurn start", {
+      playerIndex,
+      diceValue,
+      myIndex: this.getMyIndex(),
+      ts: Date.now(),
+    });
+
     this.ui.setLastRoll(diceValue);
     this.ui.setMoving(true);
 
@@ -519,13 +720,38 @@ export default class ParallaxScene extends Phaser.Scene {
       maxX: this.camCtl.getMaxXPadding(40),
       duration: this.MOVE_MS,
       onComplete: () => {
+        console.log("[CLIENT][ParallaxScene] playMoveTurn onComplete", {
+          playerIndex,
+          diceValue,
+          stepsNow: this.players.getSteps(playerIndex),
+          ts: Date.now(),
+        });
+
         this.ui.setMoving(false);
 
         const stepsNow = this.players.getSteps(playerIndex);
 
         this.tasks.handleAfterMove(playerIndex, stepsNow, () => {
+          console.log("[CLIENT][ParallaxScene] tasks.handleAfterMove done", {
+            playerIndex,
+            stepsNow,
+            ts: Date.now(),
+          });
+
           this.taskFlow.handleWeddingSeatingAfterMove(playerIndex, stepsNow, () => {
+            console.log("[CLIENT][ParallaxScene] taskFlow.handleWeddingSeatingAfterMove done", {
+              playerIndex,
+              stepsNow,
+              ts: Date.now(),
+            });
+
             this.noamTasks.handleAfterMove(playerIndex, stepsNow, () => {
+              console.log("[CLIENT][ParallaxScene] noamTasks.handleAfterMove done", {
+                playerIndex,
+                stepsNow,
+                ts: Date.now(),
+              });
+
               const followIdx = this.getMyIndex() ?? 0;
 
               this.refreshHUD();
@@ -547,6 +773,12 @@ export default class ParallaxScene extends Phaser.Scene {
     deltaSteps: number,
     done?: () => void
   ) {
+    console.log("[CLIENT][ParallaxScene] playPenaltyMove start", {
+      playerIndex,
+      deltaSteps,
+      ts: Date.now(),
+    });
+
     this.ui.setMoving(true);
 
     this.players.moveByDice({
@@ -558,6 +790,12 @@ export default class ParallaxScene extends Phaser.Scene {
       duration: 850,
       ease: "Sine.easeInOut",
       onComplete: () => {
+        console.log("[CLIENT][ParallaxScene] playPenaltyMove onComplete", {
+          playerIndex,
+          deltaSteps,
+          ts: Date.now(),
+        });
+
         this.ui.setMoving(false);
 
         const followIdx = this.getMyIndex() ?? 0;
@@ -572,12 +810,23 @@ export default class ParallaxScene extends Phaser.Scene {
   }
 
   private lockForTask() {
+    console.log("[CLIENT][ParallaxScene] lockForTask", {
+      myIndex: this.getMyIndex(),
+      ts: Date.now(),
+    });
+
     this.ui.setDiceDisabled(true);
     this.ui.setDiceVisibleDeferred(false);
     this.soloMatch?.setPaused(true);
   }
 
   private unlockAfterTask() {
+    console.log("[CLIENT][ParallaxScene] unlockAfterTask", {
+      mode: this.mode,
+      myIndex: this.getMyIndex(),
+      ts: Date.now(),
+    });
+
     if (this.mode === "solo") {
       this.soloMatch?.setPaused(false);
       this.ui.setDiceDisabled(this.soloIsBotTurn);
@@ -596,6 +845,13 @@ export default class ParallaxScene extends Phaser.Scene {
       }
 
       const can = this.net.canRollNow();
+
+      console.log("[CLIENT][ParallaxScene] unlockAfterTask net restore", {
+        me,
+        can,
+        ts: Date.now(),
+      });
+
       this.ui.setDiceDisabled(!can);
       this.ui.setDiceVisibleDeferred(can);
       this.refreshHUD();
@@ -613,6 +869,14 @@ export default class ParallaxScene extends Phaser.Scene {
   }
 
   private refreshHUD() {
+    console.log("[CLIENT][ParallaxScene] refreshHUD", {
+      mode: this.mode,
+      playerCount: this.playerCount,
+      myPlayerIndex: this.myPlayerIndex,
+      currentTurnName: this.currentTurnName,
+      ts: Date.now(),
+    });
+
     this.hudCtl.refresh({
       mode: this.mode,
       playerCount: this.playerCount,
@@ -622,6 +886,12 @@ export default class ParallaxScene extends Phaser.Scene {
   }
 
   shutdown() {
+    console.log("[CLIENT][ParallaxScene] shutdown", {
+      ts: Date.now(),
+      roomId: (this.room as any)?.roomId,
+      sessionId: (this.room as any)?.sessionId,
+    });
+
     try {
       this.room?.leave();
     } catch {}

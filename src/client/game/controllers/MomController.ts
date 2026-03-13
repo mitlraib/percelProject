@@ -4,10 +4,8 @@ export default class MomController {
   private scene: Phaser.Scene;
 
   private mom?: Phaser.GameObjects.Image;
-
   private speech?: Phaser.GameObjects.Container;
 
-  // ✅ לכל שחקן: אילו שלבים כבר הוצגו (3,10)
   private shownStepsByPlayer = new Map<number, Set<number>>();
 
   constructor(scene: Phaser.Scene) {
@@ -23,21 +21,34 @@ export default class MomController {
       this.shownStepsByPlayer.set(playerIndex, new Set<number>());
     }
     this.shownStepsByPlayer.get(playerIndex)!.add(step);
+
+    console.log("[MOM] markShown", {
+      playerIndex,
+      step,
+      ts: Date.now(),
+    });
   }
 
   showMomWithSpeech(params: {
     x: number;
     y: number;
     depth?: number;
-
     targetHeightPx?: number;
     scale?: number;
-
     speechText: string;
   }) {
     const { x, y, depth = 400, targetHeightPx, scale = 0.5, speechText } = params;
 
-    // אמא
+    console.log("[MOM] showMomWithSpeech", {
+      x,
+      y,
+      depth,
+      targetHeightPx,
+      scale,
+      speechText,
+      ts: Date.now(),
+    });
+
     if (!this.mom) {
       this.mom = this.scene.add.image(x, y, "MOM").setOrigin(0.5, 1).setDepth(depth);
     } else {
@@ -58,18 +69,25 @@ export default class MomController {
       alpha: 1,
       duration: 220,
       ease: "Sine.easeOut",
-      onComplete: () => this.showSpeechBubble(speechText, depth + 1),
+      onComplete: () => {
+        console.log("[MOM] mom fade-in complete", { ts: Date.now() });
+        this.showSpeechBubble(speechText, depth + 1);
+      },
     });
   }
 
   private showSpeechBubble(text: string, depth: number) {
     if (!this.mom) return;
 
+    console.log("[MOM] showSpeechBubble", {
+      text,
+      depth,
+      ts: Date.now(),
+    });
+
     this.hideSpeechBubble();
 
     const mom = this.mom;
-
-    // בועה בצד ימין של אמא, עם זנב שמאלה
     const bubbleX = mom.x + mom.displayWidth * 0.55;
     const bubbleY = mom.y - mom.displayHeight * 0.75;
 
@@ -120,16 +138,26 @@ export default class MomController {
   }
 
   hide() {
+    console.log("[MOM] hide", { ts: Date.now() });
     this.mom?.setVisible(false);
     this.hideSpeechBubble();
   }
 
   hideAnimated(onComplete?: () => void) {
+    console.log("[MOM] hideAnimated start", {
+      hasMom: !!this.mom,
+      hasSpeech: !!this.speech,
+      ts: Date.now(),
+    });
+
     const targets: any[] = [];
     if (this.mom && this.mom.visible) targets.push(this.mom);
     if (this.speech) targets.push(this.speech);
 
     if (targets.length === 0) {
+      console.log("[MOM] hideAnimated no targets -> onComplete()", {
+        ts: Date.now(),
+      });
       onComplete?.();
       return;
     }
@@ -140,8 +168,8 @@ export default class MomController {
       duration: 180,
       ease: "Sine.easeIn",
       onComplete: () => {
+        console.log("[MOM] hideAnimated complete", { ts: Date.now() });
         this.hide();
-        // להחזיר אלפא למקרה שמראים שוב
         if (this.mom) this.mom.setAlpha(1);
         onComplete?.();
       },
@@ -149,11 +177,13 @@ export default class MomController {
   }
 
   private hideSpeechBubble() {
+    console.log("[MOM] hideSpeechBubble", { ts: Date.now() });
     this.speech?.destroy(true);
     this.speech = undefined;
   }
 
   destroy() {
+    console.log("[MOM] destroy", { ts: Date.now() });
     this.hideSpeechBubble();
     this.mom?.destroy();
     this.mom = undefined;

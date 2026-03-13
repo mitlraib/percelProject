@@ -3,9 +3,8 @@ import MomController from "./MomController";
 import CleanupPuzzle from "../ui/CleanupPuzzle";
 
 type TaskManagerOpts = {
-  taskSteps?: number[]; // default [3,10]
+  taskSteps?: number[];
   onLockChange?: (locked: boolean) => void;
-  /** נקרא כשמשימת אמא נפתחת אצל השחקן המקומי (לשליחה לרשת) */
   onTaskOpened?: (playerIndex: number, type: "mom") => void;
 
   isBotPlayerIndex: (playerIndex: number) => boolean;
@@ -39,47 +38,77 @@ export default class TaskManager {
   }
 
   destroy() {
+    console.log("[TASKS] destroy", {
+      hadPuzzle: !!this.activePuzzle,
+      ts: Date.now(),
+    });
+
     this.activePuzzle?.destroy();
     this.activePuzzle = undefined;
 
-    // CleanupPuzzle מדליק topOnly, נחזיר
     this.scene.input.topOnly = false;
   }
 
-  /**
-   * לקרוא אחרי שהתזוזה נגמרה.
-   * done תמיד נקרא: או מיד (אין משימה), או אחרי הפאזל.
-   */
   handleAfterMove(playerIndex: number, stepsNow: number, done: () => void) {
-    // ✅ תיקון: גם אם locked, אסור להשאיר את התור "פתוח"
+    console.log("[TASKS] handleAfterMove start", {
+      playerIndex,
+      stepsNow,
+      locked: this.locked,
+      ts: Date.now(),
+    });
+
     if (this.locked) {
+      console.log("[TASKS] already locked -> done()", { ts: Date.now() });
       done();
       return;
     }
 
     const step = this.taskSteps.find((s) => s === stepsNow);
     if (!step) {
+      console.log("[TASKS] no mom task on this step -> done()", {
+        stepsNow,
+        ts: Date.now(),
+      });
       done();
       return;
     }
 
-    // SOLO: אם בוט הגיע ל-3/10 -> ממשיכים בלי אמא/פאזל
     if (this.opts.isBotPlayerIndex(playerIndex)) {
+      console.log("[TASKS] bot landed on mom step -> done()", {
+        playerIndex,
+        step,
+        ts: Date.now(),
+      });
       done();
       return;
     }
 
-    // MULTI: רק הקליינט של אותו שחקן פותח פאזל
     if (!this.opts.isLocalPlayerIndex(playerIndex)) {
+      console.log("[TASKS] remote player landed on mom step -> markShown + done()", {
+        playerIndex,
+        step,
+        ts: Date.now(),
+      });
       this.mom.markShown(playerIndex, step);
       done();
       return;
     }
 
     if (this.mom.hasShown(playerIndex, step)) {
+      console.log("[TASKS] mom step already shown -> done()", {
+        playerIndex,
+        step,
+        ts: Date.now(),
+      });
       done();
       return;
     }
+
+    console.log("[TASKS] opening mom task", {
+      playerIndex,
+      step,
+      ts: Date.now(),
+    });
 
     this.mom.markShown(playerIndex, step);
 
@@ -98,14 +127,37 @@ export default class TaskManager {
     });
 
     this.scene.time.delayedCall(2000, () => {
+      console.log("[TASKS] delayedCall after mom speech", {
+        playerIndex,
+        step,
+        ts: Date.now(),
+      });
+
       this.mom.hideAnimated(() => {
+        console.log("[TASKS] mom.hideAnimated complete", {
+          playerIndex,
+          step,
+          ts: Date.now(),
+        });
+
         this.activePuzzle?.destroy();
+
+        console.log("[TASKS] creating CleanupPuzzle", {
+          playerIndex,
+          step,
+          ts: Date.now(),
+        });
 
         this.activePuzzle = new CleanupPuzzle(this.scene, {
           depth: 25000,
           onComplete: () => {
-            this.activePuzzle = undefined;
+            console.log("[TASKS] CleanupPuzzle onComplete", {
+              playerIndex,
+              step,
+              ts: Date.now(),
+            });
 
+            this.activePuzzle = undefined;
             this.scene.input.topOnly = false;
 
             this.unlockInternal();
@@ -118,12 +170,14 @@ export default class TaskManager {
 
   private lockInternal() {
     this.locked = true;
+    console.log("[TASKS] lockInternal", { ts: Date.now() });
     this.opts.lock();
     this.opts.onLockChange?.(true);
   }
 
   private unlockInternal() {
     this.locked = false;
+    console.log("[TASKS] unlockInternal", { ts: Date.now() });
     this.opts.unlock();
     this.opts.onLockChange?.(false);
   }

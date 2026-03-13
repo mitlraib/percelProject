@@ -3,9 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
-    "build": "npm run build --prefix client",
-    "start": "npm run start --prefix server"
+    "dev": "concurrently \"npm run dev --prefix src/server\" \"npm run dev --prefix src/client\"",
+    "build": "npm run build --prefix src/client",
+    "start": "npm run start --prefix src/server"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -8,6 +8,10 @@ export default class DiceCanvas extends Phaser.GameObjects.Container {
   private rolling = false;
   private baseY: number;
 
+  private shuffleTimer?: Phaser.Time.TimerEvent;
+  private finishTimer?: Phaser.Time.TimerEvent;
+  private jumpTween?: Phaser.Tweens.Tween;
+
   constructor(scene: Phaser.Scene, x: number, y: number, size = 90) {
     super(scene, x, y);
     scene.add.existing(this);
@@ -51,45 +55,54 @@ export default class DiceCanvas extends Phaser.GameObjects.Container {
     this.setPosition(x, y);
   }
 
-  async roll(durationMs = 900): Promise<number> {
-    if (this.rolling) return this.value;
+  /**
+   * אנימציה ויזואלית בלבד – לא חוסמת את המשחק.
+   */
+  playVisualRoll(finalValue: number, durationMs = 350) {
+    if (this.rolling) {
+      this.stopRollingVisuals();
+    }
+
     this.rolling = true;
 
-    const start = Date.now();
-    const tickMs = 70;
     const jumpHeight = Math.max(8, this.height * 0.12);
 
-    const jumpTween = this.scene.tweens.add({
+    this.jumpTween = this.scene.tweens.add({
       targets: this,
       y: this.baseY - jumpHeight,
-      duration: 110,
+      duration: 90,
       yoyo: true,
-      repeat: Math.max(3, Math.floor(durationMs / 220)),
+      repeat: Math.max(2, Math.floor(durationMs / 180)),
       ease: "Sine.inOut",
     });
 
-    while (Date.now() - start < durationMs) {
-      const r = Phaser.Math.Between(1, 6);
-      this.setValue(r);
-      await this.sleep(tickMs);
-    }
+    this.shuffleTimer = this.scene.time.addEvent({
+      delay: 55,
+      loop: true,
+      callback: () => {
+        this.setValue(Phaser.Math.Between(1, 6));
+      },
+    });
 
-    const finalValue = Phaser.Math.Between(1, 6);
-    this.setValue(finalValue);
+    this.finishTimer = this.scene.time.delayedCall(durationMs, () => {
+      this.stopRollingVisuals();
+      this.setValue(finalValue);
+    });
+  }
 
-    jumpTween.stop();
+  private stopRollingVisuals() {
+    this.shuffleTimer?.remove(false);
+    this.shuffleTimer = undefined;
+
+    this.finishTimer?.remove(false);
+    this.finishTimer = undefined;
+
+    this.jumpTween?.stop();
+    this.jumpTween = undefined;
 
     this.setY(this.baseY);
     this.setScale(1);
     this.rolling = false;
-
-    return finalValue;
-  }
-
-  private sleep(ms: number) {
-    return new Promise<void>((resolve) => {
-      this.scene.time.delayedCall(ms, () => resolve());
-    });
   }
 
   private draw(size: number, value: number) {
@@ -131,5 +144,12 @@ export default class DiceCanvas extends Phaser.GameObjects.Container {
     };
 
     map[value].forEach(([x, y]) => dot(x, y));
+  }
+
+  destroy(fromScene?: boolean) {
+    this.stopRollingVisuals();
+    this.bg.destroy();
+    this.pips.destroy();
+    super.destroy(fromScene);
   }
 }

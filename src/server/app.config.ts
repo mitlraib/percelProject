@@ -7,8 +7,7 @@ import { DuoRoom } from "./rooms/DuoRoom.js";
   const server = defineServer({
     rooms: {
       my_room: defineRoom(MyRoom),
-      duo_room: defineRoom(DuoRoom), 
-
+      duo_room: defineRoom(DuoRoom),
     },
 
     routes: createRouter({

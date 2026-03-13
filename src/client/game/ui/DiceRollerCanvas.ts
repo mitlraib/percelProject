@@ -20,6 +20,7 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
   private hitZone: Phaser.GameObjects.Zone;
 
   private disabled = false;
+  private visibleFlag = true;
   private lastRoll = 0;
 
   private playerName = "";
@@ -51,12 +52,21 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
     this.hitZone = scene.add
       .zone(this.x, this.y, this.getHitSize(), this.getHitSize())
       .setScrollFactor(this.scrollFactor)
-      .setDepth(this.depth + 1)
-      .setInteractive({ useHandCursor: true });
+      .setDepth(this.depth + 1);
 
     this.hitZone.on("pointerdown", () => {
+      console.log("[CLIENT][DiceRollerCanvas] pointerdown on hitZone", {
+        disabled: this.disabled,
+        visibleFlag: this.visibleFlag,
+        diceVisible: this.dice.visible,
+        isRolling: this.dice.isRolling(),
+        ts: Date.now(),
+      });
+
       this.tryRollFromInput();
     });
+
+    this.refreshInteractivity();
   }
 
   onRoll(cb: (e: RollEvent) => void) {
@@ -71,22 +81,32 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
   setDisabled(v: boolean) {
     this.disabled = v;
 
-    this.hitZone.disableInteractive();
-    if (!v) {
-      this.hitZone.setInteractive({ useHandCursor: true });
-    }
+    console.log("[CLIENT][DiceRollerCanvas] setDisabled", {
+      disabled: v,
+      visibleFlag: this.visibleFlag,
+      ts: Date.now(),
+    });
 
     this.dice.setAlpha(v ? 0.65 : 1);
+    this.refreshInteractivity();
   }
 
   isVisible() {
-    return this.dice.visible;
+    return this.visibleFlag;
   }
 
   setVisible(v: boolean) {
+    this.visibleFlag = v;
+
+    console.log("[CLIENT][DiceRollerCanvas] setVisible", {
+      visible: v,
+      disabled: this.disabled,
+      ts: Date.now(),
+    });
+
     this.dice.setVisible(v);
     this.hitZone.setVisible(v);
-    this.hitZone.active = v;
+    this.refreshInteractivity();
   }
 
   setPlayer(name: string, emoji: string) {
@@ -122,40 +142,64 @@ export default class DiceRollerCanvas extends Phaser.Events.EventEmitter {
     return this.size + Math.max(30, Math.round(this.size * 0.45));
   }
 
+  private refreshInteractivity() {
+    const shouldBeInteractive = this.visibleFlag && !this.disabled;
+
+    console.log("[CLIENT][DiceRollerCanvas] refreshInteractivity", {
+      shouldBeInteractive,
+      visibleFlag: this.visibleFlag,
+      disabled: this.disabled,
+      ts: Date.now(),
+    });
+
+    this.hitZone.disableInteractive();
+
+    if (shouldBeInteractive) {
+      this.hitZone.setInteractive({ useHandCursor: true });
+    }
+  }
+
   tryRollFromInput() {
+    console.log("[CLIENT][DiceRollerCanvas] tryRollFromInput", {
+      disabled: this.disabled,
+      visibleFlag: this.visibleFlag,
+      diceVisible: this.dice.visible,
+      isRolling: this.dice.isRolling(),
+      ts: Date.now(),
+    });
+
     if (this.disabled) return;
+    if (!this.visibleFlag) return;
     if (!this.dice.visible) return;
     if (this.dice.isRolling()) return;
 
-    this.rollAndEmit(800);
+    const value = Phaser.Math.Between(1, 6);
+    this.lastRoll = value;
+
+    this.emit("roll", { value } satisfies RollEvent);
+    this.dice.playVisualRoll(value, 300);
   }
 
-  async roll(durationMs = 800): Promise<number> {
+  async roll(durationMs = 300): Promise<number> {
     if (this.disabled) return this.lastRoll || this.dice.getValue();
+    if (!this.visibleFlag) return this.lastRoll || this.dice.getValue();
     if (!this.dice.visible) return this.lastRoll || this.dice.getValue();
     if (this.dice.isRolling()) return this.lastRoll || this.dice.getValue();
 
-    return this.rollAndEmit(durationMs);
-  }
-
-  async rollForced(durationMs = 800): Promise<number> {
-    if (this.dice.isRolling()) return this.lastRoll || this.dice.getValue();
-
-    if (!this.dice.visible) {
-      const value = Phaser.Math.Between(1, 6);
-      this.lastRoll = value;
-      this.dice.setValue(value);
-      this.emit("roll", { value } satisfies RollEvent);
-      return value;
-    }
-
-    return this.rollAndEmit(durationMs);
-  }
-
-  private async rollAndEmit(durationMs: number) {
-    const value = await this.dice.roll(durationMs);
+    const value = Phaser.Math.Between(1, 6);
     this.lastRoll = value;
     this.emit("roll", { value } satisfies RollEvent);
+    this.dice.playVisualRoll(value, durationMs);
+    return value;
+  }
+
+  async rollForced(durationMs = 300): Promise<number> {
+    if (this.dice.isRolling()) return this.lastRoll || this.dice.getValue();
+
+    const value = Phaser.Math.Between(1, 6);
+    this.lastRoll = value;
+    this.emit("roll", { value } satisfies RollEvent);
+    this.dice.playVisualRoll(value, durationMs);
     return value;
   }
 
