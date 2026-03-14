@@ -23,23 +23,45 @@ export default class MenuScene extends Phaser.Scene {
     bg: Phaser.GameObjects.Rectangle;
   }> = [];
 
+  private resizeHandler?: () => void;
+
   constructor() {
     super("menu-scene");
   }
 
   create() {
+    this.buildMenu();
+
+    this.resizeHandler = () => {
+      this.scene.restart();
+    };
+
+    this.scale.on("resize", this.resizeHandler);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.resizeHandler) {
+        this.scale.off("resize", this.resizeHandler);
+      }
+    });
+  }
+
+  private buildMenu() {
+    this.selected = null;
+    this.optionButtons = [];
+
     const { width, height } = this.scale;
+
     const isMobile = !!(this.sys.game.device.os.android || this.sys.game.device.os.iOS);
     const isPortrait = height > width;
     const isLandscape = isMobile && !isPortrait;
+    const veryShortLandscape = isLandscape && height <= 430;
 
     this.add.rectangle(width / 2, height / 2, width, height, 0x0b0b14).setDepth(0);
 
-    // במובייל: כותרת ותת־כותרת קומפקטיות; במאוזן עוד יותר למעלה
-    const titleY = isLandscape ? 8 : isMobile ? 14 : 90;
-    const titleSize = isLandscape ? 18 : isMobile ? 22 : 54;
-    const subTitleY = titleY + (isLandscape ? 14 : isMobile ? 20 : 55);
-    const subTitleSize = isLandscape ? 10 : isMobile ? 12 : 18;
+    const titleY = isLandscape ? 8 : isMobile ? 16 : 90;
+    const titleSize = veryShortLandscape ? 16 : isLandscape ? 18 : isMobile ? 22 : 54;
+
+    const subTitleY = titleY + (veryShortLandscape ? 12 : isLandscape ? 14 : isMobile ? 22 : 55);
+    const subTitleSize = veryShortLandscape ? 9 : isLandscape ? 10 : isMobile ? 12 : 18;
 
     this.add
       .text(width / 2, titleY, "✨ המסע לחתונה ✨", {
@@ -50,7 +72,7 @@ export default class MenuScene extends Phaser.Scene {
         rtl: true,
         align: "center",
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5, 0);
 
     this.add
       .text(width / 2, subTitleY, "הדרך לחתונה רצופה בכוונות טובות", {
@@ -60,23 +82,40 @@ export default class MenuScene extends Phaser.Scene {
         rtl: true,
         align: "center",
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5, 0);
 
     const cols = 2;
-    const horizontalPadding = isMobile ? 16 : 0;
-    const gap = isMobile ? 8 : 18;
-    // במאוזן: כפתורים צרים יותר כדי שלא ייחתכו בצד
-    const maxCardW = isLandscape ? 220 : 320;
-    const cardW = Math.min(maxCardW, Math.floor((width - horizontalPadding * 2 - gap) / 2));
+    const rows = 2;
+
+    const horizontalPadding = isLandscape ? 12 : isMobile ? 16 : 24;
+    const gap = veryShortLandscape ? 8 : isMobile ? 10 : 18;
+
+    const availableW = width - horizontalPadding * 2 - gap * (cols - 1);
+    const maxCardW = veryShortLandscape ? 170 : isLandscape ? 185 : 320;
+    const cardW = Math.min(maxCardW, Math.floor(availableW / cols));
 
     const gridW = cols * cardW + (cols - 1) * gap;
-    // במאוזן: רשת צמודה לשמאל (מרווח 20px) כדי שכל הכפתורים ייכנסו ולא ייחתכו
-    const leftMargin = isLandscape ? 20 : 0;
-    const startX = isLandscape ? leftMargin + cardW / 2 : width / 2 - gridW / 2;
-    const startY = isLandscape ? subTitleY + 10 : isMobile ? subTitleY + 18 : 220;
-    const bottomMargin = isMobile ? 28 : 0;
+    const startX = width / 2 - gridW / 2;
+
+    const startY = veryShortLandscape
+      ? subTitleY + 18
+      : isLandscape
+      ? subTitleY + 22
+      : isMobile
+      ? subTitleY + 28
+      : 220;
+
+    const bottomMargin = veryShortLandscape ? 14 : isLandscape ? 18 : isMobile ? 24 : 40;
+    const availableH = height - startY - bottomMargin - gap * (rows - 1);
+
     const cardH = isMobile
-      ? Math.max(isLandscape ? 62 : 70, Math.min(isLandscape ? 78 : 92, Math.floor((height - startY - bottomMargin - gap) / 2)))
+      ? Math.max(
+          veryShortLandscape ? 54 : isLandscape ? 62 : 78,
+          Math.min(
+            veryShortLandscape ? 68 : isLandscape ? 80 : 100,
+            Math.floor(availableH / rows)
+          )
+        )
       : 140;
 
     const startGame = (count: number) => {
@@ -104,34 +143,84 @@ export default class MenuScene extends Phaser.Scene {
 
       const compactCard = isMobile;
       const extraCompact = isLandscape;
-      const emojiY = extraCompact ? -cardH / 2 + 6 : compactCard ? -cardH / 2 + 10 : -cardH / 2 + 16;
-      const labelY = extraCompact ? -cardH / 2 + 8 : compactCard ? -cardH / 2 + 12 : -cardH / 2 + 18;
-      const descY = extraCompact ? -cardH / 2 + 28 : compactCard ? -cardH / 2 + 38 : -cardH / 2 + 48;
+
+      const emojiFontSize = veryShortLandscape
+        ? "16px"
+        : extraCompact
+        ? "18px"
+        : compactCard
+        ? "22px"
+        : "32px";
+
+      const labelFontSize = veryShortLandscape
+        ? "11px"
+        : extraCompact
+        ? "12px"
+        : compactCard
+        ? "15px"
+        : "18px";
+
+      const descFontSize = veryShortLandscape
+        ? "8px"
+        : extraCompact
+        ? "9px"
+        : compactCard
+        ? "11px"
+        : "14px";
+
+      const leftPad = veryShortLandscape ? 10 : extraCompact ? 12 : 18;
+      const textStartX = veryShortLandscape ? 44 : extraCompact ? 52 : 68;
+
+      const emojiY = veryShortLandscape
+        ? -cardH / 2 + 5
+        : extraCompact
+        ? -cardH / 2 + 6
+        : compactCard
+        ? -cardH / 2 + 10
+        : -cardH / 2 + 16;
+
+      const labelY = veryShortLandscape
+        ? -cardH / 2 + 7
+        : extraCompact
+        ? -cardH / 2 + 8
+        : compactCard
+        ? -cardH / 2 + 12
+        : -cardH / 2 + 18;
+
+      const descY = veryShortLandscape
+        ? -cardH / 2 + 24
+        : extraCompact
+        ? -cardH / 2 + 28
+        : compactCard
+        ? -cardH / 2 + 38
+        : -cardH / 2 + 48;
+
       const emoji = this.add
-        .text(-cardW / 2 + (extraCompact ? 12 : 18), emojiY, opt.emoji, {
+        .text(-cardW / 2 + leftPad, emojiY, opt.emoji, {
           fontFamily: "Arial",
-          fontSize: extraCompact ? "18px" : isMobile ? (compactCard ? "22px" : "28px") : "32px",
+          fontSize: emojiFontSize,
           color: "#ffffff",
         })
         .setOrigin(0, 0);
 
       const label = this.add
-        .text(-cardW / 2 + (extraCompact ? 52 : 68), labelY, opt.label, {
+        .text(-cardW / 2 + textStartX, labelY, opt.label, {
           fontFamily: "Arial",
-          fontSize: extraCompact ? "12px" : isMobile ? (compactCard ? "15px" : "17px") : "18px",
+          fontSize: labelFontSize,
           fontStyle: "bold",
           color: "#ffffff",
           rtl: true,
+          wordWrap: { width: cardW - textStartX - 8 },
         })
         .setOrigin(0, 0);
 
       const desc = this.add
-        .text(-cardW / 2 + (extraCompact ? 52 : 68), descY, opt.desc, {
+        .text(-cardW / 2 + textStartX, descY, opt.desc, {
           fontFamily: "Arial",
-          fontSize: extraCompact ? "9px" : isMobile ? (compactCard ? "11px" : "13px") : "14px",
+          fontSize: descFontSize,
           color: "#b7b7c9",
-          wordWrap: { width: cardW - (extraCompact ? 60 : 90) },
           rtl: true,
+          wordWrap: { width: cardW - textStartX - 8 },
         })
         .setOrigin(0, 0);
 
@@ -144,12 +233,16 @@ export default class MenuScene extends Phaser.Scene {
       );
 
       container.on("pointerover", () => {
-        if (this.selected !== opt.count) bg.setStrokeStyle(2, 0xff66cc, 0.5);
+        if (this.selected !== opt.count) {
+          bg.setStrokeStyle(2, 0xff66cc, 0.5);
+        }
         this.input.setDefaultCursor("pointer");
       });
 
       container.on("pointerout", () => {
-        if (this.selected !== opt.count) bg.setStrokeStyle(2, 0x2a2a44, 1);
+        if (this.selected !== opt.count) {
+          bg.setStrokeStyle(2, 0x2a2a44, 1);
+        }
         this.input.setDefaultCursor("default");
       });
 
@@ -163,6 +256,7 @@ export default class MenuScene extends Phaser.Scene {
 
       container.setAlpha(0);
       container.y += 20;
+
       this.tweens.add({
         targets: container,
         alpha: 1,
@@ -184,9 +278,7 @@ export default class MenuScene extends Phaser.Scene {
 
       b.bg.setFillStyle(isSelected ? 0x201033 : 0x16162a, 1);
       b.bg.setStrokeStyle(2, isSelected ? 0xff66cc : 0x2a2a44, 1);
-
       b.container.setScale(isSelected ? 1.02 : 1);
     }
-
   }
 }

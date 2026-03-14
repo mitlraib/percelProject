@@ -31,6 +31,11 @@ export default class WorldBuilder {
     return !!(device.os.android || device.os.iOS);
   }
 
+  private isMobileLandscape(): boolean {
+    const { width, height } = this.scene.scale;
+    return this.isMobileDevice() && width > height;
+  }
+
   private getDefaultGroundOffsetY(): number {
     const h = this.scene.scale.height;
 
@@ -39,6 +44,53 @@ export default class WorldBuilder {
     }
 
     return Math.round(h * 0.15);
+  }
+
+  /**
+   * דוחף את שכבות הקרקע קצת מתחת למסך כדי להסתיר תחתית שקופה / ריקה
+   * ובכך למנוע את הפס הסגול שנראה מתחת לאדמה במובייל מאוזן.
+   */
+  private getBottomBleed(): number {
+    const { height } = this.scene.scale;
+
+    if (this.isMobileLandscape()) {
+      return Math.round(height * 0.12);
+    }
+
+    if (this.isMobileDevice()) {
+      return Math.round(height * 0.05);
+    }
+
+    return 0;
+  }
+
+  /**
+   * גובה שכבת הקרקע עצמה.
+   * במובייל מאוזן נגדיל מעט כדי שהאדמה תרגיש נמוכה ומלאה יותר.
+   */
+  private getGroundTargetHeight(height: number, groundY: number): number {
+    const visibleBottomPart = height - groundY;
+    const bleed = this.getBottomBleed();
+
+    if (this.isMobileLandscape()) {
+      return Math.max(height * 0.34, 130) + visibleBottomPart + bleed;
+    }
+
+    if (this.isMobileDevice()) {
+      return Math.max(height * 0.28, 100) + visibleBottomPart + bleed;
+    }
+
+    return Math.max(height * 0.18, 80) + visibleBottomPart;
+  }
+
+  private getPlantsTargetHeight(viewHeight: number, groundY: number): number {
+    const fromGroundToBottom = viewHeight - groundY;
+    const overlap = Math.max(150, viewHeight * 0.22);
+    const bleed = this.getBottomBleed();
+
+    return Math.ceil(
+      Math.max(fromGroundToBottom + overlap + bleed, viewHeight * 0.32, 200)
+    );
   }
 
   build(opts: {
@@ -54,12 +106,14 @@ export default class WorldBuilder {
 
     const { width, height } = this.scene.scale;
     const groundY = height - this.groundOffsetY;
+    const bottomBleed = this.getBottomBleed();
 
     this.sky = this.scene.add
       .image(0, 0, "sky")
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(-1000);
+
     this.sky.setDisplaySize(width, height);
 
     const plateauHeight = Math.max(height * 0.55, 220);
@@ -74,14 +128,10 @@ export default class WorldBuilder {
     });
     this.plateauLayer = plateau.sprites;
 
-    // במובייל: רצועת אדמה גבוהה יותר כדי לכסות את התחתית במאוזן (בלי ורוד)
-    const groundPathHeight = this.isMobileDevice()
-      ? Math.max(height * 0.28, 100)
-      : Math.max(height * 0.18, 80);
-    const groundFullHeight = groundPathHeight + (height - groundY);
+    const groundFullHeight = this.getGroundTargetHeight(height, groundY);
     const ground = this.buildRepeatedLayer({
       texture: "ground",
-      y: height,
+      y: height + bottomBleed,
       totalWidth: this.totalWidth,
       scrollFactor: 1,
       targetHeight: groundFullHeight,
@@ -93,7 +143,7 @@ export default class WorldBuilder {
     const plantsHeight = this.getPlantsTargetHeight(height, groundY);
     const plants = this.buildRepeatedLayer({
       texture: "plants",
-      y: height,
+      y: height + bottomBleed,
       totalWidth: this.totalWidth,
       scrollFactor: 1.15,
       targetHeight: plantsHeight,
@@ -126,14 +176,6 @@ export default class WorldBuilder {
     return { groundY };
   }
 
-  private getPlantsTargetHeight(viewHeight: number, groundY: number): number {
-    const fromGroundToBottom = viewHeight - groundY;
-    const overlap = Math.max(150, viewHeight * 0.22);
-    return Math.ceil(
-      Math.max(fromGroundToBottom + overlap, viewHeight * 0.32, 200)
-    );
-  }
-
   resize(opts: {
     totalWidth?: number;
     groundOffsetY?: number;
@@ -155,6 +197,7 @@ export default class WorldBuilder {
 
     const { width, height } = this.scene.scale;
     const groundY = height - this.groundOffsetY;
+    const bottomBleed = this.getBottomBleed();
 
     if (this.sky) {
       this.sky.setPosition(0, 0);
@@ -173,14 +216,11 @@ export default class WorldBuilder {
       depth: -300,
     });
 
-    const groundPathHeight = this.isMobileDevice()
-      ? Math.max(height * 0.28, 100)
-      : Math.max(height * 0.18, 80);
-    const groundFullHeight = groundPathHeight + (height - groundY);
+    const groundFullHeight = this.getGroundTargetHeight(height, groundY);
     this.relayoutRepeatedLayer({
       sprites: this.groundLayer,
       texture: "ground",
-      y: height,
+      y: height + bottomBleed,
       totalWidth: this.totalWidth,
       targetHeight: groundFullHeight,
       originY: 1,
@@ -192,7 +232,7 @@ export default class WorldBuilder {
     this.relayoutRepeatedLayer({
       sprites: this.plantsLayer,
       texture: "plants",
-      y: height,
+      y: height + bottomBleed,
       totalWidth: this.totalWidth,
       targetHeight: plantsHeight,
       originY: 1,
