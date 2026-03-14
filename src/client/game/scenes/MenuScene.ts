@@ -23,10 +23,6 @@ export default class MenuScene extends Phaser.Scene {
     bg: Phaser.GameObjects.Rectangle;
   }> = [];
 
-  private startBtn!: Phaser.GameObjects.Container;
-  private startBg!: Phaser.GameObjects.Rectangle;
-  private startLabel!: Phaser.GameObjects.Text;
-
   constructor() {
     super("menu-scene");
   }
@@ -167,71 +163,6 @@ export default class MenuScene extends Phaser.Scene {
 
       this.optionButtons.push({ opt, container, bg });
     });
-
-    const btnW =
-      cols === 1 ? Math.min(420, width - horizontalPadding * 2) : Math.min(420, Math.floor(width * 0.7));
-    const btnH = isMobile ? 58 : 64;
-
-    this.startBg = this.add
-      .rectangle(0, 0, btnW, btnH, 0x2a2a44, 1)
-      .setStrokeStyle(2, 0x2a2a44, 1);
-
-    this.startLabel = this.add
-      .text(0, 0, "🎲 Start Adventure!", {
-        fontFamily: "Arial",
-        fontSize: isMobile ? "20px" : "22px",
-        fontStyle: "bold",
-        color: "#9a9ab3",
-      })
-      .setOrigin(0.5);
-
-    const rowsCount = Math.ceil(PLAYER_OPTIONS.length / cols);
-    const btnY = startY + rowsCount * (cardH + gap) + (isMobile ? 34 : 48);
-
-    this.startBtn = this.add.container(width / 2, btnY, [
-      this.startBg,
-      this.startLabel,
-    ]);
-
-    this.startBtn.setSize(btnW, btnH);
-    this.startBtn.setDepth(3);
-
-    this.startBtn.setInteractive(
-      new Phaser.Geom.Rectangle(-btnW / 2, -btnH / 2, btnW, btnH),
-      Phaser.Geom.Rectangle.Contains
-    );
-
-    this.startBtn.on("pointerover", () => {
-      if (this.selected !== null) {
-        this.startBg.setStrokeStyle(2, 0xff66cc, 1);
-        this.startBtn.setScale(1.03);
-      }
-      this.input.setDefaultCursor(this.selected !== null ? "pointer" : "not-allowed");
-    });
-
-    this.startBtn.on("pointerout", () => {
-      this.startBtn.setScale(1);
-      this.refreshStartButton();
-      this.input.setDefaultCursor("default");
-    });
-
-    this.startBtn.on("pointerdown", () => {
-      if (this.selected === null) return;
-      startGame(this.selected);
-    });
-
-    this.startBtn.setAlpha(0);
-    this.startBtn.y += 20;
-    this.tweens.add({
-      targets: this.startBtn,
-      alpha: 1,
-      y: this.startBtn.y - 20,
-      duration: 350,
-      delay: 650,
-      ease: "Sine.out",
-    });
-
-    this.refreshStartButton();
   }
 
   private setSelected(count: number) {
@@ -246,20 +177,5 @@ export default class MenuScene extends Phaser.Scene {
       b.container.setScale(isSelected ? 1.02 : 1);
     }
 
-    this.refreshStartButton();
-  }
-
-  private refreshStartButton() {
-    const enabled = this.selected !== null;
-
-    if (enabled) {
-      this.startBg.setFillStyle(0xff66cc, 1);
-      this.startBg.setStrokeStyle(2, 0xff66cc, 1);
-      this.startLabel.setColor("#0b0b14");
-    } else {
-      this.startBg.setFillStyle(0x2a2a44, 1);
-      this.startBg.setStrokeStyle(2, 0x2a2a44, 1);
-      this.startLabel.setColor("#9a9ab3");
-    }
   }
 }

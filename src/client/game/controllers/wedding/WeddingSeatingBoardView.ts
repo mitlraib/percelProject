@@ -20,8 +20,14 @@ export default class WeddingSeatingBoardView {
     this.durationSec = durationSec;
   }
 
+  private isMobile(): boolean {
+    const device = (this.scene as Phaser.Scene & { sys: { game: { device?: { os?: { android?: boolean; iOS?: boolean } } } } }).sys?.game?.device;
+    return !!(device?.os?.android || device?.os?.iOS);
+  }
+
   build(onSubmit: () => void): WeddingBoardRefs {
     const { width, height } = this.scene.scale;
+    const mobile = this.isMobile();
 
     const backdrop = this.scene.add
       .rectangle(0, 0, width, height, 0x000000, 0.5)
@@ -29,12 +35,14 @@ export default class WeddingSeatingBoardView {
       .setScrollFactor(0)
       .setDepth(this.depth);
 
+    const panelW = mobile ? Math.min(width * 0.96, 420) : Math.min(1040, width * 0.92);
+    const panelH = mobile ? Math.min(height * 0.88, 520) : Math.min(660, height * 0.9);
     const panel = this.scene.add
       .rectangle(
         width / 2,
-        height / 2 - 6,
-        Math.min(1040, width * 0.92),
-        Math.min(660, height * 0.9),
+        height / 2 - (mobile ? 0 : 6),
+        panelW,
+        panelH,
         0xfaf2e8,
         1
       )
@@ -43,11 +51,11 @@ export default class WeddingSeatingBoardView {
       .setDepth(this.depth + 1);
 
     const panelTop = panel.y - panel.height / 2;
-
+    const titleY = mobile ? panelTop + 10 : panelTop + 16;
     const titleText = this.scene.add
-      .text(width / 2, panelTop + 16, "סידור שולחנות", {
+      .text(width / 2, titleY, "סידור שולחנות", {
         fontFamily: "Arial",
-        fontSize: "22px",
+        fontSize: mobile ? "18px" : "22px",
         color: "#3a1f1f",
         fontStyle: "bold",
       })
@@ -55,16 +63,19 @@ export default class WeddingSeatingBoardView {
       .setScrollFactor(0)
       .setDepth(this.depth + 2);
 
+    const rulesX = mobile ? panel.x + panel.width / 2 - 14 : width / 2;
+    const rulesY = mobile ? panelTop + 34 : panelTop + 52;
+    const rulesWrap = mobile ? Math.min(220, panel.width * 0.48) : Math.min(760, panel.width * 0.74);
     const rulesText = this.scene.add
-      .text(width / 2, panelTop + 52, this.buildRulesText(), {
+      .text(rulesX, rulesY, this.buildRulesText(), {
         fontFamily: "Arial",
-        fontSize: "12px",
+        fontSize: mobile ? "11px" : "12px",
         color: "#4a3a3a",
-        align: "center",
-        wordWrap: { width: Math.min(760, panel.width * 0.74) },
+        align: mobile ? "right" : "center",
+        wordWrap: { width: rulesWrap },
         rtl: true,
       })
-      .setOrigin(0.5, 0)
+      .setOrigin(mobile ? 1 : 0.5, 0)
       .setScrollFactor(0)
       .setDepth(this.depth + 2);
 
@@ -79,10 +90,11 @@ export default class WeddingSeatingBoardView {
       .setScrollFactor(0)
       .setDepth(this.depth + 2);
 
+    const statusY = panel.y + panel.height / 2 - (mobile ? 56 : 72);
     const statusText = this.scene.add
-      .text(width / 2, panel.y + panel.height / 2 - 72, "גררי את האורחים לשולחנות", {
+      .text(width / 2, statusY, "גררי את האורחים לשולחנות", {
         fontFamily: "Arial",
-        fontSize: "15px",
+        fontSize: mobile ? "13px" : "15px",
         color: "#2d4a22",
         fontStyle: "bold",
         align: "center",
@@ -125,18 +137,27 @@ export default class WeddingSeatingBoardView {
     depth: number
   ): SeatView[] {
     const seats: SeatView[] = [];
+    const mobile = this.isMobile();
 
     const cols = Math.min(2, this.canon.tablesCount);
     const rows = Math.ceil(this.canon.tablesCount / cols);
 
-    const gridCenterX = panel.x;
-    const gridCenterY = panel.y + 20;
+    const gridCenterX = mobile ? panel.x + 28 : panel.x;
+    const gridCenterY = mobile ? panel.y + 52 : panel.y + 20;
 
-    const gapX = 180;
-    const gapY = 145;
+    const gapX = mobile ? 140 : 180;
+    const gapY = mobile ? 118 : 145;
 
     const startX = gridCenterX - ((cols - 1) * gapX) / 2;
     const startY = gridCenterY - ((rows - 1) * gapY) / 2;
+
+    const tableW = mobile ? 96 : 112;
+    const tableH = mobile ? 66 : 78;
+    const seatW = mobile ? 46 : 54;
+    const seatH = mobile ? 22 : 26;
+    const seatZoneW = mobile ? 54 : 62;
+    const seatZoneH = mobile ? 30 : 34;
+    const labelOffset = mobile ? -46 : -54;
 
     for (let t = 0; t < this.canon.tablesCount; t++) {
       const col = t % cols;
@@ -146,15 +167,15 @@ export default class WeddingSeatingBoardView {
       const tableY = startY + row * gapY;
 
       const tableCircle = this.scene.add
-        .ellipse(tableX, tableY, 112, 78, 0xe5d3b3, 1)
+        .ellipse(tableX, tableY, tableW, tableH, 0xe5d3b3, 1)
         .setStrokeStyle(3, 0x6a4e32)
         .setScrollFactor(0)
         .setDepth(depth);
 
       const tableLabel = this.scene.add
-        .text(tableX, tableY - 54, `שולחן ${t + 1}`, {
+        .text(tableX, tableY + labelOffset, `שולחן ${t + 1}`, {
           fontFamily: "Arial",
-          fontSize: "15px",
+          fontSize: mobile ? "13px" : "15px",
           color: "#3d2b1f",
           fontStyle: "bold",
         })
@@ -165,23 +186,23 @@ export default class WeddingSeatingBoardView {
       root.add([tableCircle, tableLabel]);
 
       const seatPositions = [
-        { x: tableX - 48, y: tableY - 8 },
-        { x: tableX, y: tableY - 20 },
-        { x: tableX + 48, y: tableY - 8 },
+        { x: tableX - (mobile ? 40 : 48), y: tableY - (mobile ? 6 : 8) },
+        { x: tableX, y: tableY - (mobile ? 16 : 20) },
+        { x: tableX + (mobile ? 40 : 48), y: tableY - (mobile ? 6 : 8) },
       ];
 
       for (let s = 0; s < this.canon.seatsPerTable; s++) {
         const pos = seatPositions[s];
 
         const bg = this.scene.add
-          .rectangle(pos.x, pos.y, 54, 26, 0xffffff, 0.96)
+          .rectangle(pos.x, pos.y, seatW, seatH, 0xffffff, 0.96)
           .setStrokeStyle(2, 0x8b7355)
           .setScrollFactor(0)
           .setDepth(depth + 1);
 
-          const zone = this.scene.add
-          .zone(pos.x, pos.y, 62, 34)
-          .setRectangleDropZone(62, 34)
+        const zone = this.scene.add
+          .zone(pos.x, pos.y, seatZoneW, seatZoneH)
+          .setRectangleDropZone(seatZoneW, seatZoneH)
           .setScrollFactor(0)
           .setDepth(depth + 2);
 

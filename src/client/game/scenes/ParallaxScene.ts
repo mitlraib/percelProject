@@ -889,13 +889,23 @@ export default class ParallaxScene extends Phaser.Scene {
           const bg = this.add.graphics();
           const bw = label.width + padX * 2;
           const bh = label.height + padY * 2;
+          const gapAboveMom = 18;
+          const tailH = 20;
+          const tailW = 14;
           bg.fillStyle(0xffffff, 1);
           bg.lineStyle(2, 0x111111, 0.9);
           bg.fillRoundedRect(-bw / 2, -bh / 2, bw, bh, 16);
           bg.strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, 16);
+          bg.fillTriangle(0, bh / 2, -tailW, bh / 2 + tailH, tailW, bh / 2 + tailH);
+          bg.lineBetween(0, bh / 2, -tailW, bh / 2 + tailH);
+          bg.lineBetween(0, bh / 2, tailW, bh / 2 + tailH);
+          bg.lineBetween(-tailW, bh / 2 + tailH, tailW, bh / 2 + tailH);
+
+          const momHeadY = momY - momH;
+          const bubbleY = momHeadY - bh / 2 - gapAboveMom - tailH;
 
           const bubble = this.add
-            .container(width * 0.5, height * 0.38, [bg, label])
+            .container(momX, bubbleY, [bg, label])
             .setScrollFactor(0)
             .setDepth(depth + 1);
 

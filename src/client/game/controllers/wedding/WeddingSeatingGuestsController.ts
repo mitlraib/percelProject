@@ -28,18 +28,24 @@ export default class WeddingSeatingGuestsController {
     this.opts = opts;
   }
 
+  private isMobile(): boolean {
+    const device = (this.scene as Phaser.Scene & { sys: { game: { device?: { os?: { android?: boolean; iOS?: boolean } } } } }).sys?.game?.device;
+    return !!(device?.os?.android || device?.os?.iOS);
+  }
+
   build(panel: Phaser.GameObjects.Rectangle) {
     const guests = this.canon.guests;
+    const mobile = this.isMobile();
 
-    const cardW = 120;
-    const cardH = 36;
+    const cardW = mobile ? 98 : 120;
+    const cardH = mobile ? 32 : 36;
     const perSide = Math.ceil(guests.length / 2);
+    const margin = mobile ? 62 : 95;
+    const leftX = panel.x - panel.width / 2 + margin;
+    const rightX = panel.x + panel.width / 2 - margin;
 
-    const leftX = panel.x - panel.width / 2 + 95;
-    const rightX = panel.x + panel.width / 2 - 95;
-
-    const startY = panel.y - 115;
-    const gapY = 52;
+    const startY = panel.y - (mobile ? 92 : 115);
+    const gapY = mobile ? 38 : 52;
 
     guests.forEach((guest, index) => {
       const isLeft = index < perSide;
