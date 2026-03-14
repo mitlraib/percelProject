@@ -133,11 +133,15 @@ export default class NoamTaskManager {
 
     const { x, y } = this.opts.getStepWorldXY(stepForPos);
 
+    const h = this.scene.scale.height;
+    const device = (this.scene as Phaser.Scene & { sys?: { game?: { device?: { os?: { android?: boolean; iOS?: boolean } } } } }).sys?.game?.device;
+    const isMobile = !!(device?.os?.android || device?.os?.iOS);
+    const noamH = isMobile ? Math.min(200, Math.round(h * 0.28)) : 400;
     this.npc.show({
       x,
       y,
       depth: 400,
-      targetHeightPx: 400,
+      targetHeightPx: noamH,
       speechText: "אוי! תכף החתונה! אני זקוק לעזרה בלסגור ספקים לחתונה!",
     });
 

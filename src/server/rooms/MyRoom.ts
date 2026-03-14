@@ -10,6 +10,8 @@ type ReadyPayload = { ok: boolean };
 type PlayerMeta = { name?: string; avatar?: string };
 type PlayersMetaPayload = { names: (string | null)[]; avatars: (string | null)[] };
 
+const KALI_NAME = "קלי";
+
 export class MyRoom extends Room {
   maxClients = 4;
 
@@ -20,6 +22,21 @@ export class MyRoom extends Room {
   private currentTurn = 0;
   private ready = false;
   private metas: PlayerMeta[] = [];
+
+  private getKaliIndex(): number {
+    for (let i = 0; i < this.metas.length; i++) {
+      const name = this.metas[i]?.name?.trim();
+      if (name === KALI_NAME) return i;
+    }
+    return -1;
+  }
+
+  private applyKaliFirstTurn() {
+    if (!this.ready || this.players.length === 0) return;
+    const kaliIdx = this.getKaliIndex();
+    this.currentTurn = kaliIdx >= 0 ? kaliIdx : 0;
+    this.broadcast("turn", { currentTurn: this.currentTurn } satisfies TurnPayload);
+  }
 
   onCreate() {
     // sync ← מחזיר הכל כדי שלא נפספס
@@ -95,6 +112,7 @@ export class MyRoom extends Room {
 
       this.metas[idx] = { name, avatar };
       this.broadcastPlayersMeta();
+      this.applyKaliFirstTurn();
     });
 
     // משימה נפתחה אצל שחקן – משדרים לכולם כדי להציג "X עוזר לי כרגע" אצל השאר
@@ -130,9 +148,8 @@ export class MyRoom extends Room {
     this.broadcast("ready", { ok: this.ready } satisfies ReadyPayload);
     this.broadcastPlayersMeta();
 
-    // אם נהיינו ready עכשיו, בוחרים התחלה (0)
-    if (this.ready && this.currentTurn < 0) this.currentTurn = 0;
     if (this.ready) {
+      this.applyKaliFirstTurn();
       // אם התור “נפל” מחוץ לטווח בגלל יציאות/כניסות — מתקנים
       if (this.currentTurn >= this.players.length) this.currentTurn = 0;
       this.broadcast("turn", { currentTurn: this.currentTurn } satisfies TurnPayload);

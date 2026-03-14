@@ -75,6 +75,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
   private readonly fixedDiceSeqPlayer0 = [5, 2, 3, 5, 6, 6];
   private fixedDiceSeqIndex0 = 0;
+  private static readonly KALI_NAME = "קלי";
 
   private waitingSyncTimer: Phaser.Time.TimerEvent | null = null;
   private lastRollClickTs: number | null = null;
@@ -339,9 +340,14 @@ export default class ParallaxScene extends Phaser.Scene {
 
       let finalValue = value;
       const meIdx = this.getMyIndex();
+      const currentTurn = this.net?.getState().currentTurn ?? -1;
+      const isKaliTurn =
+        meIdx !== null &&
+        meIdx === currentTurn &&
+        this.getPlayerDisplayName(meIdx).trim() === ParallaxScene.KALI_NAME;
 
       if (
-        meIdx === 0 &&
+        isKaliTurn &&
         this.fixedDiceSeqIndex0 < this.fixedDiceSeqPlayer0.length
       ) {
         finalValue = this.fixedDiceSeqPlayer0[this.fixedDiceSeqIndex0++];
@@ -859,8 +865,8 @@ export default class ParallaxScene extends Phaser.Scene {
           const { width, height } = this.scale;
           const depth = 9000;
           const momH = this.isMobileDevice()
-            ? Math.min(280, Math.round(height * 0.38))
-            : Math.min(380, height * 0.5);
+            ? Math.min(220, Math.round(height * 0.32))
+            : Math.min(440, Math.round(height * 0.55));
           const momX = width * 0.5;
           const momY = height * 0.72;
 
@@ -941,8 +947,8 @@ export default class ParallaxScene extends Phaser.Scene {
           }
           const depth = 9000;
           const noamH = this.isMobileDevice()
-            ? Math.min(260, Math.round(height * 0.36))
-            : Math.min(360, height * 0.48);
+            ? Math.min(220, Math.round(height * 0.32))
+            : Math.min(420, Math.round(height * 0.52));
           const noamX = width * 0.5;
           const noamY = height * 0.72;
 
@@ -1035,7 +1041,9 @@ export default class ParallaxScene extends Phaser.Scene {
 
           const tex = dad.texture.getSourceImage() as HTMLImageElement;
           const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
-          const targetH = Math.min(360, height * 0.55);
+          const targetH = this.isMobileDevice()
+            ? Math.min(220, Math.round(height * 0.32))
+            : Math.min(420, Math.round(height * 0.55));
           dad.setDisplaySize(targetH * ratio, targetH);
 
           const bubbleWidth = Math.min(560, width * 0.5);

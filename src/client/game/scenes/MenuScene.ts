@@ -34,10 +34,11 @@ export default class MenuScene extends Phaser.Scene {
 
     this.add.rectangle(width / 2, height / 2, width, height, 0x0b0b14).setDepth(0);
 
-    const titleY = isMobile ? 22 : 90;
-    const titleSize = isMobile ? (isPortrait ? 26 : 34) : 54;
-    const subTitleY = titleY + (isMobile ? (isPortrait ? 26 : 32) : 55);
-    const subTitleSize = isMobile ? (isPortrait ? 13 : 15) : 18;
+    // במובייל: כותרת ותת־כותרת קומפקטיות כדי שכל 4 האפשרויות ייכנסו במסך
+    const titleY = isMobile ? 14 : 90;
+    const titleSize = isMobile ? 22 : 54;
+    const subTitleY = titleY + (isMobile ? 20 : 55);
+    const subTitleSize = isMobile ? 12 : 18;
 
     this.add
       .text(width / 2, titleY, "✨ המסע לחתונה ✨", {
@@ -60,18 +61,19 @@ export default class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    const cols = isMobile && isPortrait ? 1 : 2;
-    const horizontalPadding = isMobile ? 20 : 0;
-    const gap = isMobile ? (isPortrait ? 10 : 12) : 18;
-    const cardW =
-      cols === 1
-        ? Math.min(420, width - horizontalPadding * 2)
-        : Math.min(320, Math.floor(width * 0.42));
-    const cardH = isMobile ? (isPortrait ? 88 : 100) : 140;
+    // במובייל תמיד 2x2 (שתי שורות) כדי שהתפריט לא ייחתך – כל 4 האפשרויות גלויות
+    const cols = 2;
+    const horizontalPadding = isMobile ? 16 : 0;
+    const gap = isMobile ? 8 : 18;
+    const cardW = Math.min(320, Math.floor((width - horizontalPadding * 2 - gap) / 2));
 
     const gridW = cols * cardW + (cols - 1) * gap;
     const startX = width / 2 - gridW / 2;
-    const startY = isMobile ? (isPortrait ? subTitleY + 20 : 130) : 220;
+    const startY = isMobile ? subTitleY + 18 : 220;
+    const bottomMargin = isMobile ? 28 : 0;
+    const cardH = isMobile
+      ? Math.max(70, Math.min(92, Math.floor((height - startY - bottomMargin - gap) / 2)))
+      : 140;
 
     const startGame = (count: number) => {
       const mode: "solo" | "local" = count === 1 ? "solo" : "local";
@@ -96,7 +98,7 @@ export default class MenuScene extends Phaser.Scene {
         .rectangle(0, 0, cardW, cardH, 0x16162a, 1)
         .setStrokeStyle(2, 0x2a2a44, 1);
 
-      const compactCard = isMobile && isPortrait;
+      const compactCard = isMobile;
       const emojiY = compactCard ? -cardH / 2 + 10 : -cardH / 2 + 16;
       const labelY = compactCard ? -cardH / 2 + 12 : -cardH / 2 + 18;
       const descY = compactCard ? -cardH / 2 + 38 : -cardH / 2 + 48;

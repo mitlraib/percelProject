@@ -42,8 +42,9 @@ export default class WeddingSeatingIntro {
 
       const tex = this.introDad.texture.getSourceImage() as HTMLImageElement;
       const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
-
-      const targetH = Math.min(420, height * 0.58);
+      const device = (this.scene as Phaser.Scene & { sys?: { game?: { device?: { os?: { android?: boolean; iOS?: boolean } } } } }).sys?.game?.device;
+      const isMobile = !!(device?.os?.android || device?.os?.iOS);
+      const targetH = isMobile ? Math.min(200, Math.round(height * 0.28)) : Math.min(420, height * 0.58);
       this.introDad.setDisplaySize(targetH * ratio, targetH);
     }
 

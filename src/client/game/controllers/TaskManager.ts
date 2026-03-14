@@ -121,7 +121,7 @@ export default class TaskManager {
     const height = this.scene.scale.height;
     const device = (this.scene as Phaser.Scene & { sys?: { game?: { device?: { os?: { android?: boolean; iOS?: boolean } } } } }).sys?.game?.device;
     const isMobile = !!(device?.os?.android || device?.os?.iOS);
-    const momHeight = isMobile ? Math.min(280, Math.round(height * 0.38)) : 400;
+    const momHeight = isMobile ? Math.min(200, Math.round(height * 0.28)) : 400;
 
     this.mom.showMomWithSpeech({
       x,

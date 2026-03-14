@@ -63,14 +63,15 @@ export default class WeddingSeatingBoardView {
       .setScrollFactor(0)
       .setDepth(this.depth + 2);
 
-    const rulesX = mobile ? panel.x + panel.width / 2 - 6 : width / 2;
-    const rulesY = mobile ? panelTop + 26 : panelTop + 52;
-    const rulesWrap = mobile ? Math.min(200, panel.width * 0.44) : Math.min(760, panel.width * 0.74);
+    const rulesX = mobile ? panel.x + panel.width / 2 - 4 : width / 2;
+    const rulesY = mobile ? panelTop + 18 : panelTop + 52;
+    const rulesWrap = mobile ? Math.min(185, panel.width * 0.42) : Math.min(760, panel.width * 0.74);
     const rulesText = this.scene.add
       .text(rulesX, rulesY, this.buildRulesText(), {
         fontFamily: "Arial",
-        fontSize: mobile ? "11px" : "12px",
-        color: "#4a3a3a",
+        fontSize: mobile ? "11px" : "17px",
+        fontStyle: mobile ? "normal" : "bold",
+        color: mobile ? "#4a3a3a" : "#2d1f1f",
         align: mobile ? "right" : "center",
         wordWrap: { width: rulesWrap },
         rtl: true,
@@ -142,8 +143,8 @@ export default class WeddingSeatingBoardView {
     const cols = Math.min(2, this.canon.tablesCount);
     const rows = Math.ceil(this.canon.tablesCount / cols);
 
-    const gridCenterX = mobile ? panel.x - 8 : panel.x;
-    const gridCenterY = mobile ? panel.y + 72 : panel.y + 20;
+    const gridCenterX = mobile ? panel.x - 24 : panel.x;
+    const gridCenterY = mobile ? panel.y + 88 : panel.y + 20;
 
     const gapX = mobile ? 140 : 180;
     const gapY = mobile ? 118 : 145;

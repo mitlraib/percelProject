@@ -202,13 +202,16 @@ export default class VendorsTaskUI {
     input.spellcheck = false;
     input.dir = "rtl";
 
+    const w = this.scene.scale.width;
+    const h = this.scene.scale.height;
+    // מיקום התיבה בדיוק מעל האזור הגרפי של השדה בפאנל (root במרכז, אזור הקלט ב־y≈19)
+    const inputCenterY = h / 2 + 19;
     input.style.position = "fixed";
-    input.style.left = "50%";
-    // טיפ טיפה מעל מה שהיינו קודם – קצת יותר קרוב לאזור הטקסט
-    input.style.top = "55%";
+    input.style.left = `${w / 2}px`;
+    input.style.top = `${inputCenterY}px`;
     input.style.transform = "translate(-50%, -50%)";
-    input.style.width = "min(94vw, 720px)";
-    input.style.height = "60px";
+    input.style.width = `min(94vw, ${Math.min(720, w - 48)}px)`;
+    input.style.height = "56px";
     input.style.padding = "0 20px";
     input.style.fontSize = "22px";
     input.style.borderRadius = "12px";
