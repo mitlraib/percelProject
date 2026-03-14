@@ -8,21 +8,23 @@ import WorldBuilder from "../controllers/WorldBuilder";
 import SceneUI from "../controllers/SceneUI";
 import TaskManager from "../controllers/TaskManager";
 import NoamTaskManager from "../controllers/NoamTaskManager";
-import NetGameController, { type NetStateView } from "../controllers/NetGameController";
+import NetGameController, {
+  type NetStateView,
+} from "../controllers/NetGameController";
 import SoloVsBotMatch from "../match/SoloVsBotMatch";
 
 import ParallaxLayoutManager from "./parallax/ParallaxLayoutManager";
 import ParallaxHudController from "./parallax/ParallaxHudController";
 import ParallaxTaskFlowController from "./parallax/ParallaxTaskFlowController";
+import ParallaxModeController from "./parallax/ParallaxModeController";
+import ParallaxMovementController from "./parallax/ParallaxMovementController";
+import ParallaxOverlayController from "./parallax/ParallaxOverlayController";
+
 import type {
   ExtendedNetStateView,
   LayoutMetrics,
   Mode,
 } from "./parallax/ParallaxTypes";
-import {
-  REGISTRY_DISPLAY_NAME,
-  REGISTRY_AVATAR_DATA_URL,
-} from "./PlayerSetupScene";
 
 export default class ParallaxScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -48,6 +50,10 @@ export default class ParallaxScene extends Phaser.Scene {
   private hudCtl!: ParallaxHudController;
   private taskFlow!: ParallaxTaskFlowController;
 
+  private modeCtl!: ParallaxModeController;
+  private movementCtl!: ParallaxMovementController;
+  private overlayCtl!: ParallaxOverlayController;
+
   private currentTurnName = "";
   private myPlayerIndex: number | null = null;
 
@@ -64,7 +70,6 @@ export default class ParallaxScene extends Phaser.Scene {
   private laneOffsets: number[] = [];
   private playerTargetHeight = 70;
 
-  private rotateOverlay?: Phaser.GameObjects.Container;
   private isGameBlockedForPortrait = false;
 
   // מהירות תנועת השחקנים קדימה – מעט יותר איטית
@@ -144,7 +149,6 @@ export default class ParallaxScene extends Phaser.Scene {
       new URL("../../assets/NOAM.png", import.meta.url).toString()
     );
 
-    // דמות מיוחדת עבור השם "קלי"
     this.load.image(
       "KALI",
       new URL("../../assets/KALI.png", import.meta.url).toString()
@@ -223,10 +227,7 @@ export default class ParallaxScene extends Phaser.Scene {
       onTaskOpened: (_, type) => this.net?.sendTaskStarted?.(type),
       isBotPlayerIndex: (idx) => this.mode === "solo" && idx === 1,
       isLocalPlayerIndex: isLocalIdx,
-      getStepWorldXY: (step) => ({
-        x: this.laneStartX + (step - 1) * this.stepSizePx,
-        y: this.groundY - Math.max(10, this.scale.height * 0.015),
-      }),
+      getStepWorldXY: (step) => this.getStepWorldXY(step),
       lock: () => this.lockForTask(),
       unlock: () => this.unlockAfterTask(),
     });
@@ -236,10 +237,7 @@ export default class ParallaxScene extends Phaser.Scene {
       onTaskOpened: (_, type) => this.net?.sendTaskStarted?.(type),
       isBotPlayerIndex: (idx) => this.mode === "solo" && idx === 1,
       isLocalPlayerIndex: isLocalIdx,
-      getStepWorldXY: (step) => ({
-        x: this.laneStartX + (step - 1) * this.stepSizePx,
-        y: this.groundY - Math.max(10, this.scale.height * 0.015),
-      }),
+      getStepWorldXY: (step) => this.getStepWorldXY(step),
       lock: () => this.lockForTask(),
       unlock: () => this.unlockAfterTask(),
       onFailPenalty: (playerIndex, deltaSteps, done) => {
@@ -251,7 +249,7 @@ export default class ParallaxScene extends Phaser.Scene {
         });
 
         if (!this.net) {
-          this.playPenaltyMove(playerIndex, deltaSteps, done);
+          this.movementCtl.playPenaltyMove(playerIndex, deltaSteps, done);
           return;
         }
 
@@ -285,12 +283,140 @@ export default class ParallaxScene extends Phaser.Scene {
           deltaSteps,
           ts: Date.now(),
         });
-        this.playPenaltyMove(playerIndex, deltaSteps, done);
+        this.movementCtl.playPenaltyMove(playerIndex, deltaSteps, done);
       },
       onRefreshHud: () => this.refreshHUD(),
     });
 
-    this.attachNetOrSolo();
+    this.overlayCtl = new ParallaxOverlayController(this, {
+      isMobileDevice: () => this.isMobileDevice(),
+      onPortraitBlockedChange: (blocked) => {
+        this.isGameBlockedForPortrait = blocked;
+      },
+      onBlockInput: () => {
+        this.ui?.setDiceDisabled(true);
+        this.ui?.setDiceVisibleDeferred(false);
+      },
+      onUnblockInput: () => {
+        if (
+          !this.tasks?.isLocked?.() &&
+          !this.noamTasks?.isLocked?.() &&
+          !this.taskFlow?.hasActiveSeatingTask?.()
+        ) {
+          this.unlockAfterTask();
+        }
+        this.refreshHUD();
+      },
+    });
+
+    this.movementCtl = new ParallaxMovementController(
+      this,
+      this.players,
+      this.camCtl,
+      this.ui,
+      this.tasks,
+      this.noamTasks,
+      this.taskFlow,
+      {
+        moveMs: this.MOVE_MS,
+        getLaneStartX: () => this.laneStartX,
+        getStepSizePx: () => this.stepSizePx,
+        getMyIndex: () => this.getMyIndex(),
+        refreshHUD: () => this.refreshHUD(),
+      }
+    );
+
+    this.modeCtl = new ParallaxModeController(
+      this,
+      this.players,
+      this.camCtl,
+      this.ui,
+      this.tasks,
+      this.noamTasks,
+      this.hudCtl,
+      this.overlayCtl,
+      {
+        mode: this.mode,
+        playerCount: this.playerCount,
+
+        getRoom: () => this.room,
+        setRoom: (room) => {
+          this.room = room;
+        },
+
+        getNet: () => this.net,
+        setNet: (net) => {
+          this.net = net;
+        },
+
+        getSoloMatch: () => this.soloMatch,
+        setSoloMatch: (match) => {
+          this.soloMatch = match;
+        },
+
+        getMyPlayerIndex: () => this.myPlayerIndex,
+        setMyPlayerIndex: (value) => {
+          this.myPlayerIndex = value;
+        },
+
+        getCurrentTurnName: () => this.currentTurnName,
+        setCurrentTurnName: (value) => {
+          this.currentTurnName = value;
+        },
+
+        getNetWasReady: () => this.netWasReady,
+        setNetWasReady: (value) => {
+          this.netWasReady = value;
+        },
+
+        getLeavingToMenu: () => this.leavingToMenu,
+        setLeavingToMenu: (value) => {
+          this.leavingToMenu = value;
+        },
+
+        getLocalAvatarDataUrl: () => this.localAvatarDataUrl,
+        setLocalAvatarDataUrl: (value) => {
+          this.localAvatarDataUrl = value;
+        },
+
+        getWaitingSyncTimer: () => this.waitingSyncTimer,
+        setWaitingSyncTimer: (value) => {
+          this.waitingSyncTimer = value;
+        },
+
+        getLastRollClickTs: () => this.lastRollClickTs,
+
+        getFixedDiceSeq: () => this.fixedDiceSeqPlayer0,
+        getFixedDiceSeqIndex: () => this.fixedDiceSeqIndex0,
+        setFixedDiceSeqIndex: (value) => {
+          this.fixedDiceSeqIndex0 = value;
+        },
+
+        getKaliName: () => ParallaxScene.KALI_NAME,
+
+        getMyIndex: () => this.getMyIndex(),
+        getPlayerDisplayName: (playerIndex) =>
+          this.getPlayerDisplayName(playerIndex),
+        refreshHUD: () => this.refreshHUD(),
+
+        playMoveTurn: (playerIndex, diceValue, onTurnFinished) =>
+          this.movementCtl.playMoveTurn(playerIndex, diceValue, onTurnFinished),
+
+        playPenaltyMove: (playerIndex, deltaSteps, done) =>
+          this.movementCtl.playPenaltyMove(playerIndex, deltaSteps, done),
+
+        lockForTask: () => this.lockForTask(),
+        unlockAfterTask: () => this.unlockAfterTask(),
+
+        onSoloBotTurnChange: (isBot) => {
+          this.soloIsBotTurn = isBot;
+        },
+
+        isPortraitBlocked: () => this.isGameBlockedForPortrait,
+      }
+    );
+
+    this.modeCtl.attachNetOrSolo();
 
     const spaceKey = this.input.keyboard?.addKey(
       Phaser.Input.Keyboard.KeyCodes.SPACE
@@ -338,45 +464,17 @@ export default class ParallaxScene extends Phaser.Scene {
 
       if (this.mode === "solo") return;
 
-      let finalValue = value;
-      const meIdx = this.getMyIndex();
-      const currentTurn = this.net?.getState().currentTurn ?? -1;
-      const isKaliTurn =
-        meIdx !== null &&
-        meIdx === currentTurn &&
-        this.getPlayerDisplayName(meIdx).trim() === ParallaxScene.KALI_NAME;
-
-      if (
-        isKaliTurn &&
-        this.fixedDiceSeqIndex0 < this.fixedDiceSeqPlayer0.length
-      ) {
-        finalValue = this.fixedDiceSeqPlayer0[this.fixedDiceSeqIndex0++];
-      }
-
       if (this.net) {
-        if (this.getMyIndex() === null) return;
-        if (!this.net.canRollNow()) return;
-
-        this.ui.dice.playVisualRoll(finalValue, 600);
-        this.ui.setDiceVisibleDeferred(true);
-
-        console.log("[CLIENT] sending roll to server", {
-          value: finalValue,
-          myIndex: this.getMyIndex(),
-          canRollNow: this.net.canRollNow(),
-          ts: Date.now(),
-        });
-
-        this.net.sendRoll(finalValue);
+        this.modeCtl.handleDiceRoll(value);
         return;
       }
 
-      this.playMoveTurn(0, finalValue);
+      this.movementCtl.playMoveTurn(0, value);
     });
 
     this.refreshHUD();
-    this.createRotateOverlay();
-    this.refreshRotateOverlay();
+    this.overlayCtl.createRotateOverlay();
+    this.overlayCtl.refreshRotateOverlay();
 
     this.scale.on("resize", this.handleResize, this);
 
@@ -386,98 +484,6 @@ export default class ParallaxScene extends Phaser.Scene {
   private isMobileDevice(): boolean {
     const device = this.sys.game.device;
     return !!(device.os.android || device.os.iOS);
-  }
-
-  private shouldBlockForPortrait(width: number, height: number): boolean {
-    return this.isMobileDevice() && height > width;
-  }
-
-  private createRotateOverlay() {
-    const { width, height } = this.scale;
-
-    const bg = this.add
-      .rectangle(0, 0, width, height, 0x05050c, 0.94)
-      .setOrigin(0, 0)
-      .setScrollFactor(0);
-
-    const icon = this.add
-      .text(width / 2, height / 2 - 110, "📱↺", {
-        fontFamily: "Arial",
-        fontSize: `${Math.max(40, Math.min(width * 0.12, 68))}px`,
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0);
-
-    const title = this.add
-      .text(width / 2, height / 2 - 40, "סובבי את המכשיר", {
-        fontFamily: "Arial",
-        fontSize: `${Math.max(26, Math.min(width * 0.07, 40))}px`,
-        fontStyle: "bold",
-        color: "#ff66cc",
-        align: "center",
-        rtl: true,
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0);
-
-    const subtitle = this.add
-      .text(width / 2, height / 2 + 20, "כדי לשחק, צריך מצב אופקי", {
-        fontFamily: "Arial",
-        fontSize: `${Math.max(16, Math.min(width * 0.04, 24))}px`,
-        color: "#ffffff",
-        align: "center",
-        rtl: true,
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0);
-
-    this.rotateOverlay = this.add
-      .container(0, 0, [bg, icon, title, subtitle])
-      .setDepth(200000)
-      .setScrollFactor(0);
-
-    this.rotateOverlay.setVisible(false);
-  }
-
-  private refreshRotateOverlay() {
-    const { width, height } = this.scale;
-    const shouldBlock = this.shouldBlockForPortrait(width, height);
-
-    this.isGameBlockedForPortrait = shouldBlock;
-
-    if (!this.rotateOverlay) return;
-
-    const bg = this.rotateOverlay.list[0] as Phaser.GameObjects.Rectangle;
-    const icon = this.rotateOverlay.list[1] as Phaser.GameObjects.Text;
-    const title = this.rotateOverlay.list[2] as Phaser.GameObjects.Text;
-    const subtitle = this.rotateOverlay.list[3] as Phaser.GameObjects.Text;
-
-    bg.setPosition(0, 0);
-    bg.setSize(width, height);
-
-    icon.setPosition(width / 2, height / 2 - 110);
-    title.setPosition(width / 2, height / 2 - 40);
-    subtitle.setPosition(width / 2, height / 2 + 20);
-
-    icon.setFontSize(Math.max(40, Math.min(width * 0.12, 68)));
-    title.setFontSize(Math.max(26, Math.min(width * 0.07, 40)));
-    subtitle.setFontSize(Math.max(16, Math.min(width * 0.04, 24)));
-
-    this.rotateOverlay.setVisible(shouldBlock);
-
-    if (shouldBlock) {
-      this.ui?.setDiceDisabled(true);
-      this.ui?.setDiceVisibleDeferred(false);
-    } else {
-      if (
-        !this.tasks?.isLocked?.() &&
-        !this.noamTasks?.isLocked?.() &&
-        !this.taskFlow?.hasActiveSeatingTask?.()
-      ) {
-        this.unlockAfterTask();
-      }
-      this.refreshHUD();
-    }
   }
 
   private applyLayoutValues(layout: LayoutMetrics) {
@@ -530,595 +536,7 @@ export default class ParallaxScene extends Phaser.Scene {
       this.camCtl?.follow(this.players?.getContainer(followIdx));
     });
 
-    this.refreshRotateOverlay();
-  }
-
-  private attachNetOrSolo() {
-    console.log("[CLIENT][ParallaxScene] attachNetOrSolo", {
-      mode: this.mode,
-      playerCount: this.playerCount,
-      ts: Date.now(),
-    });
-
-    if (this.mode === "solo") {
-      this.attachSolo();
-      return;
-    }
-
-    if (this.playerCount === 1) {
-      this.currentTurnName = "תור שלך";
-      return;
-    }
-
-    const room = this.registry.get("room") as Room | undefined;
-    const existingNet = this.registry.get("net") as
-      | NetGameController
-      | undefined;
-
-    console.log("[CLIENT][ParallaxScene] registry room/net", {
-      hasRoom: !!room,
-      hasExistingNet: !!existingNet,
-      ts: Date.now(),
-    });
-
-    if (!room) {
-      this.game.events.once("room-ready", () => {
-        const r = this.registry.get("room") as Room | undefined;
-        const net = this.registry.get("net") as NetGameController | undefined;
-        console.log("[CLIENT][ParallaxScene] room-ready event", {
-          hasRoom: !!r,
-          hasNet: !!net,
-          ts: Date.now(),
-        });
-        if (r) this.attachNet(r, net);
-      });
-      return;
-    }
-
-    this.attachNet(room, existingNet);
-  }
-
-  private attachNet(room: Room, existingNet?: NetGameController) {
-    console.log("[CLIENT][ParallaxScene] attachNet", {
-      hasExistingNet: !!existingNet,
-      roomId: (room as any)?.roomId,
-      sessionId: (room as any)?.sessionId,
-      ts: Date.now(),
-    });
-
-    this.room = room;
-    this.net = existingNet ?? new NetGameController(room, this.playerCount);
-
-    const displayName = this.registry.get(REGISTRY_DISPLAY_NAME) as
-      | string
-      | undefined;
-    const avatarDataUrl = this.registry.get(REGISTRY_AVATAR_DATA_URL) as
-      | string
-      | undefined;
-
-    this.localAvatarDataUrl = avatarDataUrl ?? null;
-
-    if (displayName || avatarDataUrl) {
-      this.net.sendPlayerMeta(displayName, avatarDataUrl);
-    }
-
-    const applyNetState = (rawState: NetStateView) => {
-      const s = rawState as ExtendedNetStateView;
-
-      console.log("[CLIENT] applyNetState", {
-        myIndexBefore: this.myPlayerIndex,
-        stateMyIndex: s.myIndex,
-        currentTurn: s.currentTurn,
-        canRollNow: s.canRollNow,
-        ready: s.ready,
-        names: s.names,
-        ts: Date.now(),
-      });
-
-      if (!s.ready) {
-        console.log("[CLIENT] applyNetState => not ready", {
-          myIndex: this.myPlayerIndex,
-          currentTurn: s.currentTurn,
-          netWasReady: this.netWasReady,
-          leavingToMenu: this.leavingToMenu,
-          ts: Date.now(),
-        });
-
-        if (this.netWasReady) {
-          this.ui.setDicePlayer("מחכה לשחקניות…", "⏳");
-          this.ui.setDiceDisabled(true);
-          this.ui.setDiceVisibleDeferred(false);
-          this.currentTurnName = "שחקנית התנתקה – חוזרים לתפריט";
-          this.refreshHUD();
-
-          if (!this.leavingToMenu) {
-            this.leavingToMenu = true;
-            this.time.delayedCall(1800, () => {
-              console.log("[CLIENT] other player disconnected → back to menu", {
-                ts: Date.now(),
-              });
-              try {
-                this.room?.leave();
-              } catch {}
-              this.registry.remove("room");
-              this.registry.remove("net");
-              this.scene.start("menu-scene");
-            });
-          }
-          return;
-        }
-
-        this.ui.setDicePlayer("מחכה לשחקנים…", "⏳");
-        this.ui.setDiceDisabled(true);
-        this.ui.setDiceVisibleDeferred(false);
-        this.currentTurnName = "מחכה לשחקנים…";
-        this.refreshHUD();
-
-        if (!this.waitingSyncTimer && this.net) {
-          this.waitingSyncTimer = this.time.addEvent({
-            delay: 1500,
-            callback: () => {
-              console.log("[CLIENT] waitingSyncTimer requestSync", {
-                ts: Date.now(),
-              });
-              this.net?.requestSync?.();
-            },
-            loop: true,
-          });
-        }
-        return;
-      }
-
-      if (this.waitingSyncTimer) {
-        this.waitingSyncTimer.destroy();
-        this.waitingSyncTimer = null;
-      }
-
-      this.netWasReady = true;
-
-      if (s.myIndex !== null && s.myIndex !== undefined) {
-        this.myPlayerIndex = s.myIndex;
-      }
-
-      const fallbackNames = this.hudCtl.getCharNames(
-        this.mode,
-        this.playerCount,
-        this.myPlayerIndex
-      );
-
-      const names =
-        s.names && s.names.length
-          ? s.names.map((n, i) => n ?? fallbackNames[i] ?? "שחקן")
-          : fallbackNames;
-
-      const emojis = ["👧", "🐶", "🐻", "🎮"];
-
-      const me = this.getMyIndex();
-
-      try {
-        const avatars = s.avatars ?? [];
-        avatars.forEach((dataUrl, idx) => {
-          if (
-            !dataUrl ||
-            typeof dataUrl !== "string" ||
-            !dataUrl.startsWith("data:image")
-          ) {
-            return;
-          }
-
-          const key = `player-avatar-${idx}`;
-          if (!this.textures.exists(key)) {
-            this.textures.once("addtexture", (texKey: string) => {
-              if (texKey === key) this.players?.setPlayerTexture(idx, key);
-            });
-            this.textures.addBase64(key, dataUrl);
-          } else {
-            this.players?.setPlayerTexture(idx, key);
-          }
-        });
-
-        if (
-          me !== null &&
-          this.localAvatarDataUrl &&
-          (!s.avatars || !s.avatars[me]) &&
-          this.localAvatarDataUrl.startsWith("data:image")
-        ) {
-          const localKey = `player-local-avatar-${me}`;
-          if (!this.textures.exists(localKey)) {
-            this.textures.once("addtexture", (texKey: string) => {
-              if (texKey === localKey)
-                this.players?.setPlayerTexture(me, localKey);
-            });
-            this.textures.addBase64(localKey, this.localAvatarDataUrl);
-          } else {
-            this.players?.setPlayerTexture(me, localKey);
-          }
-        }
-
-        // אם יש שחקנית בשם "קלי" – נשתמש בטקסטורה המיוחדת KALI בשבילה
-        if (this.textures.exists("KALI")) {
-          names.forEach((n, idx) => {
-            if (typeof n === "string" && n.trim() === "קלי") {
-              this.players?.setPlayerTexture(idx, "KALI");
-            }
-          });
-        }
-      } catch {}
-
-      const myIdxForUI = me ?? 0;
-      const myName = names[myIdxForUI] ?? "שחקן";
-      const myEmoji = emojis[myIdxForUI] ?? "🎮";
-
-      console.log("[CLIENT] ui player/canRoll decision", {
-        me,
-        myIdxForUI,
-        myName,
-        currentTurn: s.currentTurn,
-        canRollNow: s.canRollNow,
-        tasksLocked: this.tasks.isLocked(),
-        noamLocked: this.noamTasks.isLocked(),
-        seatingActive: this.taskFlow.hasActiveSeatingTask(),
-        ts: Date.now(),
-      });
-
-      this.ui.setDicePlayer(myName, myEmoji);
-
-      if (me === null) {
-        this.ui.setDiceDisabled(true);
-        this.ui.setDiceVisibleDeferred(false);
-      } else if (
-        !this.tasks.isLocked() &&
-        !this.noamTasks.isLocked() &&
-        !this.taskFlow.hasActiveSeatingTask()
-      ) {
-        this.ui.setDiceDisabled(!s.canRollNow);
-        this.ui.setDiceVisibleDeferred(s.canRollNow);
-      }
-
-      this.currentTurnName = names[s.currentTurn] ?? "";
-      this.refreshHUD();
-
-      console.log("[CLIENT] applyNetState => after UI update", {
-        me,
-        currentTurnName: this.currentTurnName,
-        diceDisabled: this.ui.isDiceDisabled(),
-        ts: Date.now(),
-      });
-
-      if (me !== null) {
-        this.camCtl.follow(this.players.getContainer(me));
-      }
-
-      this.refreshRotateOverlay();
-    };
-
-    this.net.on("state", applyNetState);
-    applyNetState(this.net.getState());
-
-    this.time.delayedCall(400, () => {
-      console.log("[CLIENT] delayed requestSync after attachNet", {
-        ts: Date.now(),
-      });
-      this.net?.requestSync?.();
-    });
-
-    this.net.on(
-      "move",
-      ({ playerIndex, value }: { playerIndex: number; value: number }) => {
-        const now = Date.now();
-        if (this.lastRollClickTs !== null) {
-          console.log(
-            "[CLIENT] latency click→move(ms)",
-            now - this.lastRollClickTs,
-            {
-              playerIndex,
-              value,
-            }
-          );
-        }
-
-        console.log("[CLIENT][ParallaxScene] net move listener", {
-          playerIndex,
-          value,
-          ts: now,
-        });
-
-        this.playMoveTurn(playerIndex, value);
-      }
-    );
-
-    this.net.on(
-      "penaltyMove",
-      ({
-        playerIndex,
-        deltaSteps,
-      }: {
-        playerIndex: number;
-        deltaSteps: number;
-      }) => {
-        console.log("[CLIENT][ParallaxScene] net penaltyMove listener", {
-          playerIndex,
-          deltaSteps,
-          ts: Date.now(),
-        });
-        this.playPenaltyMove(playerIndex, deltaSteps);
-      }
-    );
-
-    this.net.on(
-      "taskStarted",
-      ({
-        type,
-        playerIndex,
-      }: {
-        type: "mom" | "noam" | "dad";
-        playerIndex: number;
-      }) => {
-        console.log("[CLIENT][ParallaxScene] net taskStarted listener", {
-          type,
-          playerIndex,
-          myIndex: this.getMyIndex(),
-          ts: Date.now(),
-        });
-
-        const me = this.getMyIndex();
-        if (me !== null && playerIndex === me) return;
-
-        const name = this.getPlayerDisplayName(playerIndex);
-
-        if (type === "mom") {
-          const { width, height } = this.scale;
-          const depth = 9000;
-          const momH = this.isMobileDevice()
-            ? Math.min(160, Math.round(height * 0.22))
-            : Math.min(440, Math.round(height * 0.55));
-          const momX = width * 0.5;
-          const momY = height * 0.72;
-
-          const momImg = this.add
-            .image(momX, momY, "MOM")
-            .setOrigin(0.5, 1)
-            .setScrollFactor(0)
-            .setDepth(depth);
-
-          const tex = momImg.texture.getSourceImage() as HTMLImageElement;
-          const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
-          momImg.setDisplaySize(momH * ratio, momH);
-
-          const bubbleW = Math.min(520, width * 0.85);
-          const speechText = `${name} עוזר/ת לי כרגע... מיד תתפנה אליכן.`;
-          const label = this.add
-            .text(0, 0, speechText, {
-              fontFamily: "Arial",
-              fontSize: "20px",
-              color: "#111",
-              align: "right",
-              wordWrap: { width: bubbleW - 32, useAdvancedWrap: true },
-            })
-            .setOrigin(0.5, 0.5);
-
-          const padX = 18;
-          const padY = 14;
-          const bg = this.add.graphics();
-          const bw = label.width + padX * 2;
-          const bh = label.height + padY * 2;
-          const gapAboveMom = 18;
-          const tailH = 20;
-          const tailW = 14;
-          bg.fillStyle(0xffffff, 1);
-          bg.lineStyle(2, 0x111111, 0.9);
-          bg.fillRoundedRect(-bw / 2, -bh / 2, bw, bh, 16);
-          bg.strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, 16);
-          bg.fillTriangle(0, bh / 2, -tailW, bh / 2 + tailH, tailW, bh / 2 + tailH);
-          bg.lineBetween(0, bh / 2, -tailW, bh / 2 + tailH);
-          bg.lineBetween(0, bh / 2, tailW, bh / 2 + tailH);
-          bg.lineBetween(-tailW, bh / 2 + tailH, tailW, bh / 2 + tailH);
-
-          const momHeadY = momY - momH;
-          const bubbleY = momHeadY - bh / 2 - gapAboveMom - tailH;
-
-          const bubble = this.add
-            .container(momX, bubbleY, [bg, label])
-            .setScrollFactor(0)
-            .setDepth(depth + 1);
-
-          momImg.setAlpha(0);
-          bubble.setAlpha(0);
-
-          this.tweens.add({
-            targets: [momImg, bubble],
-            alpha: 1,
-            duration: 220,
-            ease: "Sine.easeOut",
-          });
-
-          const showMs = 5500;
-          this.time.delayedCall(showMs, () => {
-            this.tweens.add({
-              targets: [momImg, bubble],
-              alpha: 0,
-              duration: 200,
-              ease: "Sine.easeIn",
-              onComplete: () => {
-                momImg.destroy();
-                bubble.destroy();
-              },
-            });
-          });
-        } else if (type === "noam") {
-          const { width, height } = this.scale;
-          if (!this.textures.exists("NOAM")) {
-            return;
-          }
-          const depth = 9000;
-          const noamH = this.isMobileDevice()
-            ? Math.min(220, Math.round(height * 0.32))
-            : Math.min(420, Math.round(height * 0.52));
-          const noamX = width * 0.5;
-          const noamY = height * 0.72;
-
-          const noamImg = this.add
-            .image(noamX, noamY, "NOAM")
-            .setOrigin(0.5, 1)
-            .setScrollFactor(0)
-            .setDepth(depth);
-
-          const tex = noamImg.texture.getSourceImage() as HTMLImageElement;
-          const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
-          noamImg.setDisplaySize(noamH * ratio, noamH);
-
-          const bubbleW = Math.min(480, width * 0.82);
-          const speechText = `${name} עוזרת לי כרגע... מיד היא תתפנה אליכן.`;
-          const label = this.add
-            .text(0, 0, speechText, {
-              fontFamily: "Arial",
-              fontSize: "18px",
-              color: "#111",
-              align: "right",
-              wordWrap: { width: bubbleW - 32, useAdvancedWrap: true },
-            })
-            .setOrigin(0.5, 0.5);
-
-          const padX = 18;
-          const padY = 14;
-          const bg = this.add.graphics();
-          const bw = label.width + padX * 2;
-          const bh = label.height + padY * 2;
-          const gapAbove = 18;
-          const tailH = 18;
-          const tailW = 12;
-          bg.fillStyle(0xffffff, 1);
-          bg.lineStyle(2, 0x111111, 0.9);
-          bg.fillRoundedRect(-bw / 2, -bh / 2, bw, bh, 14);
-          bg.strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, 14);
-          bg.fillTriangle(0, bh / 2, -tailW, bh / 2 + tailH, tailW, bh / 2 + tailH);
-          bg.lineBetween(0, bh / 2, -tailW, bh / 2 + tailH);
-          bg.lineBetween(0, bh / 2, tailW, bh / 2 + tailH);
-          bg.lineBetween(-tailW, bh / 2 + tailH, tailW, bh / 2 + tailH);
-
-          const noamHeadY = noamY - noamH;
-          const bubbleY = noamHeadY - bh / 2 - gapAbove - tailH;
-
-          const bubble = this.add
-            .container(noamX, bubbleY, [bg, label])
-            .setScrollFactor(0)
-            .setDepth(depth + 1);
-
-          noamImg.setAlpha(0);
-          bubble.setAlpha(0);
-
-          this.tweens.add({
-            targets: [noamImg, bubble],
-            alpha: 1,
-            duration: 220,
-            ease: "Sine.easeOut",
-          });
-
-          const showMs = 3500;
-          this.time.delayedCall(showMs, () => {
-            this.tweens.add({
-              targets: [noamImg, bubble],
-              alpha: 0,
-              duration: 200,
-              ease: "Sine.easeIn",
-              onComplete: () => {
-                noamImg.destroy();
-                bubble.destroy();
-              },
-            });
-          });
-        } else {
-          const { width, height } = this.scale;
-          const dadKey = this.textures.exists("DAD")
-            ? "DAD"
-            : this.textures.exists("dad")
-            ? "dad"
-            : null;
-
-          if (!dadKey) {
-            return;
-          }
-
-          const dad = this.add
-            .image(width * 0.22, height * 0.9, dadKey)
-            .setScrollFactor(0)
-            .setDepth(9000);
-
-          const tex = dad.texture.getSourceImage() as HTMLImageElement;
-          const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
-          const targetH = this.isMobileDevice()
-            ? Math.min(160, Math.round(height * 0.22))
-            : Math.min(420, Math.round(height * 0.55));
-          dad.setDisplaySize(targetH * ratio, targetH);
-
-          const bubbleWidth = Math.min(560, width * 0.5);
-          const bubbleHeight = 110;
-
-          const bg = this.add
-            .rectangle(0, 0, bubbleWidth, bubbleHeight, 0xffffff, 0.98)
-            .setStrokeStyle(3, 0x4b2e2e);
-
-          const tail = this.add
-            .triangle(
-              -(bubbleWidth / 2) + 28,
-              bubbleHeight / 2 - 4,
-              0,
-              0,
-              18,
-              0,
-              5,
-              16,
-              0xffffff,
-              0.98
-            )
-            .setStrokeStyle(2, 0x4b2e2e);
-
-          const label = this.add
-            .text(
-              0,
-              0,
-              `${name} עוזר/ת לי כרגע לסדר את השולחנות... מיד תתפנה אליכן.`,
-              {
-                fontFamily: "Arial",
-                fontSize: "18px",
-                color: "#3a1f1f",
-                align: "center",
-                wordWrap: { width: bubbleWidth - 30 },
-                rtl: true,
-              }
-            )
-            .setOrigin(0.5);
-
-          const bubble = this.add
-            .container(width * 0.6, height * 0.45, [bg, tail, label])
-            .setScrollFactor(0)
-            .setDepth(9001);
-
-          dad.setAlpha(0);
-          bubble.setAlpha(0);
-
-          this.tweens.add({
-            targets: [dad, bubble],
-            alpha: 1,
-            duration: 180,
-            ease: "Sine.easeOut",
-          });
-
-          this.time.delayedCall(3000, () => {
-            this.tweens.add({
-              targets: [dad, bubble],
-              alpha: 0,
-              duration: 180,
-              ease: "Sine.easeIn",
-              onComplete: () => {
-                dad.destroy();
-                bubble.destroy();
-              },
-            });
-          });
-        }
-      }
-    );
+    this.overlayCtl?.refreshRotateOverlay();
   }
 
   private getStepWorldXY(step: number): { x: number; y: number } {
@@ -1134,7 +552,9 @@ export default class ParallaxScene extends Phaser.Scene {
       this.playerCount,
       this.myPlayerIndex
     );
-    const fromNet = this.net?.getState?.().names;
+    const fromNet = (this.net?.getState?.() as ExtendedNetStateView | NetStateView)
+      ?.names as string[] | undefined;
+
     if (
       fromNet &&
       fromNet[playerIndex] != null &&
@@ -1142,176 +562,8 @@ export default class ParallaxScene extends Phaser.Scene {
     ) {
       return fromNet[playerIndex] ?? fallback[playerIndex] ?? "שחקן";
     }
+
     return fallback[playerIndex] ?? "שחקן";
-  }
-
-  private attachSolo() {
-    console.log("[CLIENT][ParallaxScene] attachSolo", { ts: Date.now() });
-
-    this.soloMatch = new SoloVsBotMatch(this, this.ui.dice as never, {
-      name: "מיטול",
-      emoji: "👰‍♀️",
-    });
-
-    this.soloMatch.on(
-      "turn-changed",
-      (e: { player: { isBot: boolean; name: string } }) => {
-        console.log("[CLIENT][ParallaxScene] solo turn-changed", {
-          isBot: e.player.isBot,
-          name: e.player.name,
-          ts: Date.now(),
-        });
-
-        this.soloIsBotTurn = e.player.isBot;
-        this.currentTurnName = e.player.name;
-
-        this.ui.setDiceVisibleDeferred(!e.player.isBot);
-        this.ui.setDiceDisabled(e.player.isBot);
-
-        this.refreshHUD();
-      }
-    );
-
-    this.soloMatch.on(
-      "dice-rolled",
-      (e: { player: { name: string }; value: number }) => {
-        console.log("[CLIENT][ParallaxScene] solo dice-rolled", {
-          playerName: e.player.name,
-          value: e.value,
-          ts: Date.now(),
-        });
-
-        const idx = e.player.name === "מיטול" ? 0 : 1;
-        this.playMoveTurn(idx, e.value, () => this.soloMatch?.advanceTurn());
-      }
-    );
-
-    this.soloMatch.start();
-  }
-
-  private playMoveTurn(
-    playerIndex: number,
-    diceValue: number,
-    onTurnFinished?: () => void
-  ) {
-    console.log("[CLIENT][ParallaxScene] playMoveTurn start", {
-      playerIndex,
-      diceValue,
-      myIndex: this.getMyIndex(),
-      ts: Date.now(),
-    });
-
-    this.ui.setLastRoll(diceValue);
-    this.ui.setMoving(true);
-
-    this.players.moveByDice({
-      playerIndex,
-      diceValue,
-      laneStartX: this.laneStartX,
-      stepSizePx: this.stepSizePx,
-      maxX: this.camCtl.getMaxXPadding(40),
-      duration: this.MOVE_MS,
-      onComplete: () => {
-        console.log("[CLIENT][ParallaxScene] playMoveTurn onComplete", {
-          playerIndex,
-          diceValue,
-          stepsNow: this.players.getSteps(playerIndex),
-          ts: Date.now(),
-        });
-
-        this.ui.setMoving(false);
-
-        const stepsNow = this.players.getSteps(playerIndex);
-
-        console.log("[CLIENT][ParallaxScene] before tasks.handleAfterMove", {
-          playerIndex,
-          stepsNow,
-          ts: Date.now(),
-        });
-
-        this.tasks.handleAfterMove(playerIndex, stepsNow, () => {
-          console.log("[CLIENT][ParallaxScene] tasks.handleAfterMove done", {
-            playerIndex,
-            stepsNow,
-            ts: Date.now(),
-          });
-
-          this.taskFlow.handleWeddingSeatingAfterMove(
-            playerIndex,
-            stepsNow,
-            () => {
-              console.log(
-                "[CLIENT][ParallaxScene] taskFlow.handleWeddingSeatingAfterMove done",
-                {
-                  playerIndex,
-                  stepsNow,
-                  ts: Date.now(),
-                }
-              );
-
-              this.noamTasks.handleAfterMove(playerIndex, stepsNow, () => {
-                console.log("[CLIENT][ParallaxScene] noamTasks.handleAfterMove done", {
-                  playerIndex,
-                  stepsNow,
-                  ts: Date.now(),
-                });
-
-                const followIdx = this.getMyIndex() ?? 0;
-
-                this.refreshHUD();
-                this.time.delayedCall(100, () =>
-                  this.camCtl.follow(this.players.getContainer(followIdx))
-                );
-
-                this.ui.flushPendingDiceVisibility();
-                onTurnFinished?.();
-              });
-            }
-          );
-        });
-      },
-    });
-  }
-
-  private playPenaltyMove(
-    playerIndex: number,
-    deltaSteps: number,
-    done?: () => void
-  ) {
-    console.log("[CLIENT][ParallaxScene] playPenaltyMove start", {
-      playerIndex,
-      deltaSteps,
-      ts: Date.now(),
-    });
-
-    this.ui.setMoving(true);
-
-    this.players.moveByDice({
-      playerIndex,
-      diceValue: deltaSteps,
-      laneStartX: this.laneStartX,
-      stepSizePx: this.stepSizePx,
-      maxX: this.camCtl.getMaxXPadding(40),
-      duration: 1300,
-      ease: "Sine.easeInOut",
-      onComplete: () => {
-        console.log("[CLIENT][ParallaxScene] playPenaltyMove onComplete", {
-          playerIndex,
-          deltaSteps,
-          ts: Date.now(),
-        });
-
-        this.ui.setMoving(false);
-
-        const followIdx = this.getMyIndex() ?? 0;
-        this.time.delayedCall(80, () =>
-          this.camCtl.follow(this.players.getContainer(followIdx))
-        );
-
-        this.refreshHUD();
-        done?.();
-      },
-    });
   }
 
   private lockForTask() {
@@ -1412,19 +664,13 @@ export default class ParallaxScene extends Phaser.Scene {
 
     this.scale.off("resize", this.handleResize, this);
 
-    this.net?.destroy();
-    this.net = undefined;
-
-    this.soloMatch?.destroy();
-    this.soloMatch = undefined;
-
+    this.modeCtl?.destroy();
     this.taskFlow?.destroy();
 
     this.tasks?.destroy();
     this.noamTasks?.destroy();
 
-    this.rotateOverlay?.destroy();
-    this.rotateOverlay = undefined;
+    this.overlayCtl?.destroy();
 
     this.world?.destroy();
     this.players?.destroy();

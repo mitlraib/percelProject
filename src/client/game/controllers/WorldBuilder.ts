@@ -129,9 +129,10 @@ export default class WorldBuilder {
     this.plateauLayer = plateau.sprites;
 
     const groundFullHeight = this.getGroundTargetHeight(height, groundY);
+    const groundYpos = this.isMobileDevice() ? height : height + bottomBleed;
     const ground = this.buildRepeatedLayer({
       texture: "ground",
-      y: height + bottomBleed,
+      y: groundYpos,
       totalWidth: this.totalWidth,
       scrollFactor: 1,
       targetHeight: groundFullHeight,
@@ -143,7 +144,7 @@ export default class WorldBuilder {
     const plantsHeight = this.getPlantsTargetHeight(height, groundY);
     const plants = this.buildRepeatedLayer({
       texture: "plants",
-      y: height + bottomBleed,
+      y: groundYpos,
       totalWidth: this.totalWidth,
       scrollFactor: 1.15,
       targetHeight: plantsHeight,
@@ -217,10 +218,11 @@ export default class WorldBuilder {
     });
 
     const groundFullHeight = this.getGroundTargetHeight(height, groundY);
+    const groundYposResize = this.isMobileDevice() ? height : height + bottomBleed;
     this.relayoutRepeatedLayer({
       sprites: this.groundLayer,
       texture: "ground",
-      y: height + bottomBleed,
+      y: groundYposResize,
       totalWidth: this.totalWidth,
       targetHeight: groundFullHeight,
       originY: 1,
@@ -232,7 +234,7 @@ export default class WorldBuilder {
     this.relayoutRepeatedLayer({
       sprites: this.plantsLayer,
       texture: "plants",
-      y: height + bottomBleed,
+      y: groundYposResize,
       totalWidth: this.totalWidth,
       targetHeight: plantsHeight,
       originY: 1,

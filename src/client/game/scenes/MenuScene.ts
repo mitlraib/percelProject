@@ -53,15 +53,16 @@ export default class MenuScene extends Phaser.Scene {
     const isMobile = !!(this.sys.game.device.os.android || this.sys.game.device.os.iOS);
     const isPortrait = height > width;
     const isLandscape = isMobile && !isPortrait;
-    const veryShortLandscape = isLandscape && height <= 430;
+    const veryShortLandscape = isLandscape && height <= 380;
+    const shortScreen = isMobile && height <= 500;
 
     this.add.rectangle(width / 2, height / 2, width, height, 0x0b0b14).setDepth(0);
 
-    const titleY = isLandscape ? 8 : isMobile ? 16 : 90;
-    const titleSize = veryShortLandscape ? 16 : isLandscape ? 18 : isMobile ? 22 : 54;
+    const titleY = veryShortLandscape ? 4 : isLandscape ? 6 : isMobile ? 10 : 90;
+    const titleSize = veryShortLandscape ? 14 : isLandscape ? 16 : isMobile ? 18 : 54;
 
-    const subTitleY = titleY + (veryShortLandscape ? 12 : isLandscape ? 14 : isMobile ? 22 : 55);
-    const subTitleSize = veryShortLandscape ? 9 : isLandscape ? 10 : isMobile ? 12 : 18;
+    const subTitleY = titleY + (veryShortLandscape ? 10 : isLandscape ? 12 : isMobile ? 14 : 55);
+    const subTitleSize = veryShortLandscape ? 8 : isLandscape ? 9 : isMobile ? 10 : 18;
 
     this.add
       .text(width / 2, titleY, "✨ המסע לחתונה ✨", {
@@ -87,35 +88,30 @@ export default class MenuScene extends Phaser.Scene {
     const cols = 2;
     const rows = 2;
 
-    const horizontalPadding = isLandscape ? 12 : isMobile ? 16 : 24;
-    const gap = veryShortLandscape ? 8 : isMobile ? 10 : 18;
+    const horizontalPadding = veryShortLandscape ? 8 : isLandscape ? 10 : isMobile ? 12 : 24;
+    const gap = veryShortLandscape ? 6 : isMobile ? 8 : 18;
 
     const availableW = width - horizontalPadding * 2 - gap * (cols - 1);
-    const maxCardW = veryShortLandscape ? 170 : isLandscape ? 185 : 320;
+    const maxCardW = veryShortLandscape ? 140 : isLandscape ? 155 : isMobile ? 200 : 320;
     const cardW = Math.min(maxCardW, Math.floor(availableW / cols));
 
     const gridW = cols * cardW + (cols - 1) * gap;
     const startX = width / 2 - gridW / 2;
 
     const startY = veryShortLandscape
-      ? subTitleY + 18
+      ? subTitleY + 8
       : isLandscape
-      ? subTitleY + 22
+      ? subTitleY + 10
+      : shortScreen
+      ? subTitleY + 12
       : isMobile
-      ? subTitleY + 28
+      ? subTitleY + 20
       : 220;
 
-    const bottomMargin = veryShortLandscape ? 14 : isLandscape ? 18 : isMobile ? 24 : 40;
+    const bottomMargin = veryShortLandscape ? 8 : isLandscape ? 10 : isMobile ? 14 : 40;
     const availableH = height - startY - bottomMargin - gap * (rows - 1);
-
     const cardH = isMobile
-      ? Math.max(
-          veryShortLandscape ? 54 : isLandscape ? 62 : 78,
-          Math.min(
-            veryShortLandscape ? 68 : isLandscape ? 80 : 100,
-            Math.floor(availableH / rows)
-          )
-        )
+      ? Math.max(48, Math.min(veryShortLandscape ? 56 : isLandscape ? 64 : 90, Math.floor(availableH / rows)))
       : 140;
 
     const startGame = (count: number) => {

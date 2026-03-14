@@ -4,17 +4,25 @@ import PlayerSetupScene from "./scenes/PlayerSetupScene";
 import NetworkScene from "./scenes/NetworkScene";
 import ParallaxScene from "./scenes/ParallaxScene";
 
-const MOBILE_BREAKPOINT = 768;
+function getViewportSize() {
+  const vv = window.visualViewport;
+  return {
+    width: Math.round(vv?.width ?? window.innerWidth),
+    height: Math.round(vv?.height ?? window.innerHeight),
+  };
+}
 
 export default function startGame() {
   const parent = document.getElementById("game-container");
-  const w = parent ? parent.clientWidth : window.innerWidth;
-  const h = parent ? parent.clientHeight : window.innerHeight;
-  const isMobile = w < MOBILE_BREAKPOINT;
+  const viewport = getViewportSize();
 
-  // במובייל: גודל המשחק = גודל המסך בדיוק כדי שהאדמה תהיה בתחתית בלי פס ורוד/שחור (גם במאוזן)
-  const gameW = isMobile ? Math.max(320, w) : Math.max(320, w);
-  const gameH = isMobile ? h : Math.max(240, h);
+  const width = parent
+    ? Math.max(320, Math.round(parent.clientWidth || viewport.width))
+    : Math.max(320, viewport.width);
+
+  const height = parent
+    ? Math.max(240, Math.round(parent.clientHeight || viewport.height))
+    : Math.max(240, viewport.height);
 
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
@@ -22,10 +30,10 @@ export default function startGame() {
     backgroundColor: "#0b0b14",
 
     scale: {
-      mode: isMobile ? Phaser.Scale.FIT : Phaser.Scale.RESIZE,
+      mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
-      width: gameW,
-      height: gameH,
+      width,
+      height,
     },
 
     physics: {
@@ -39,5 +47,32 @@ export default function startGame() {
     scene: [MenuScene, PlayerSetupScene, NetworkScene, ParallaxScene],
   };
 
-  return new Phaser.Game(config);
+  const game = new Phaser.Game(config);
+
+  const syncGameSize = () => {
+    const container = document.getElementById("game-container");
+    const nextViewport = getViewportSize();
+
+    const nextWidth = container
+      ? Math.max(320, Math.round(container.clientWidth || nextViewport.width))
+      : Math.max(320, nextViewport.width);
+
+    const nextHeight = container
+      ? Math.max(240, Math.round(container.clientHeight || nextViewport.height))
+      : Math.max(240, nextViewport.height);
+
+    game.scale.resize(nextWidth, nextHeight);
+    game.canvas.style.width = `${nextWidth}px`;
+    game.canvas.style.height = `${nextHeight}px`;
+  };
+
+  window.addEventListener("resize", syncGameSize);
+  window.addEventListener("orientationchange", () => {
+    window.setTimeout(syncGameSize, 120);
+  });
+  window.visualViewport?.addEventListener("resize", syncGameSize);
+
+  syncGameSize();
+
+  return game;
 }
