@@ -100,6 +100,7 @@ export default class PlayerSetupScene extends Phaser.Scene {
     this.fileInput.style.padding = "8px";
     this.fileInput.style.color = "#b7b7c9";
     this.fileInput.style.fontSize = "14px";
+    this.fileInput.addEventListener("change", () => this.onFileSelected());
     this.wrapDiv.appendChild(this.fileInput);
 
     const btn = document.createElement("button");
@@ -122,18 +123,25 @@ export default class PlayerSetupScene extends Phaser.Scene {
     parent.appendChild(this.wrapDiv);
   }
 
+  private static readonly MAX_AVATAR_BYTES = 600 * 1024;
+
+  /** כשנבחר קובץ – אם גדול מדי, מציגים הודעה ומנקים את השדה כדי שיוכלו לבחור תמונה אחרת. */
+  private onFileSelected() {
+    const file = this.fileInput.files?.[0];
+    if (!file || file.size <= PlayerSetupScene.MAX_AVATAR_BYTES) return;
+    alert("התמונה גדולה מדי (מעל כ־600KB). אנא בחרי תמונה קטנה יותר.");
+    this.fileInput.value = "";
+  }
+
   private onStart() {
     const name = (this.nameInput.value || "שחקן").trim();
     this.registry.set(REGISTRY_DISPLAY_NAME, name);
 
     const file = this.fileInput.files?.[0];
     if (file) {
-      // תמונה ענקית יכולה ליצור בעיות רשת, נגביל לגודל סביר של קובץ מקור.
-      const MAX_BYTES = 600 * 1024; // ~600KB לקובץ המקורי
-      if (file.size > MAX_BYTES) {
-        alert("התמונה שבחרת גדולה מדי. נשתמש בלי תמונה כדי שהמשחק ירוץ חלק.");
-        this.registry.remove(REGISTRY_AVATAR_DATA_URL);
-        this.goToNetwork();
+      if (file.size > PlayerSetupScene.MAX_AVATAR_BYTES) {
+        alert("התמונה שבחרת גדולה מדי (מעל כ־600KB). אנא בחרי תמונה קטנה יותר.");
+        this.fileInput.value = "";
         return;
       }
 

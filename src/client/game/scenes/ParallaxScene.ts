@@ -174,7 +174,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
     const layout = this.layoutMgr.compute(this.scale.width, this.scale.height);
     if (this.isMobileDevice()) {
-      layout.groundOffsetY = Math.round(this.scale.height * 0.03);
+      layout.groundOffsetY = 0;
     }
     this.applyLayoutValues(layout);
 
@@ -491,7 +491,7 @@ export default class ParallaxScene extends Phaser.Scene {
 
     const layout = this.layoutMgr.compute(gameSize.width, gameSize.height);
     if (this.isMobileDevice()) {
-      layout.groundOffsetY = Math.round(gameSize.height * 0.03);
+      layout.groundOffsetY = 0;
     }
     this.applyLayoutValues(layout);
 
@@ -858,7 +858,9 @@ export default class ParallaxScene extends Phaser.Scene {
         if (type === "mom") {
           const { width, height } = this.scale;
           const depth = 9000;
-          const momH = Math.min(380, height * 0.5);
+          const momH = this.isMobileDevice()
+            ? Math.min(280, Math.round(height * 0.38))
+            : Math.min(380, height * 0.5);
           const momX = width * 0.5;
           const momY = height * 0.72;
 
@@ -933,7 +935,87 @@ export default class ParallaxScene extends Phaser.Scene {
             });
           });
         } else if (type === "noam") {
-          this.noamTasks.showBusyMessage(name);
+          const { width, height } = this.scale;
+          if (!this.textures.exists("NOAM")) {
+            return;
+          }
+          const depth = 9000;
+          const noamH = this.isMobileDevice()
+            ? Math.min(260, Math.round(height * 0.36))
+            : Math.min(360, height * 0.48);
+          const noamX = width * 0.5;
+          const noamY = height * 0.72;
+
+          const noamImg = this.add
+            .image(noamX, noamY, "NOAM")
+            .setOrigin(0.5, 1)
+            .setScrollFactor(0)
+            .setDepth(depth);
+
+          const tex = noamImg.texture.getSourceImage() as HTMLImageElement;
+          const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
+          noamImg.setDisplaySize(noamH * ratio, noamH);
+
+          const bubbleW = Math.min(480, width * 0.82);
+          const speechText = `${name} עוזרת לי כרגע... מיד היא תתפנה אליכן.`;
+          const label = this.add
+            .text(0, 0, speechText, {
+              fontFamily: "Arial",
+              fontSize: "18px",
+              color: "#111",
+              align: "right",
+              wordWrap: { width: bubbleW - 32, useAdvancedWrap: true },
+            })
+            .setOrigin(0.5, 0.5);
+
+          const padX = 18;
+          const padY = 14;
+          const bg = this.add.graphics();
+          const bw = label.width + padX * 2;
+          const bh = label.height + padY * 2;
+          const gapAbove = 18;
+          const tailH = 18;
+          const tailW = 12;
+          bg.fillStyle(0xffffff, 1);
+          bg.lineStyle(2, 0x111111, 0.9);
+          bg.fillRoundedRect(-bw / 2, -bh / 2, bw, bh, 14);
+          bg.strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, 14);
+          bg.fillTriangle(0, bh / 2, -tailW, bh / 2 + tailH, tailW, bh / 2 + tailH);
+          bg.lineBetween(0, bh / 2, -tailW, bh / 2 + tailH);
+          bg.lineBetween(0, bh / 2, tailW, bh / 2 + tailH);
+          bg.lineBetween(-tailW, bh / 2 + tailH, tailW, bh / 2 + tailH);
+
+          const noamHeadY = noamY - noamH;
+          const bubbleY = noamHeadY - bh / 2 - gapAbove - tailH;
+
+          const bubble = this.add
+            .container(noamX, bubbleY, [bg, label])
+            .setScrollFactor(0)
+            .setDepth(depth + 1);
+
+          noamImg.setAlpha(0);
+          bubble.setAlpha(0);
+
+          this.tweens.add({
+            targets: [noamImg, bubble],
+            alpha: 1,
+            duration: 220,
+            ease: "Sine.easeOut",
+          });
+
+          const showMs = 3500;
+          this.time.delayedCall(showMs, () => {
+            this.tweens.add({
+              targets: [noamImg, bubble],
+              alpha: 0,
+              duration: 200,
+              ease: "Sine.easeIn",
+              onComplete: () => {
+                noamImg.destroy();
+                bubble.destroy();
+              },
+            });
+          });
         } else {
           const { width, height } = this.scale;
           const dadKey = this.textures.exists("DAD")

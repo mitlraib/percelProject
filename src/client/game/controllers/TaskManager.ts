@@ -118,11 +118,16 @@ export default class TaskManager {
 
     const { x, y } = this.opts.getStepWorldXY(step);
 
+    const height = this.scene.scale.height;
+    const device = (this.scene as Phaser.Scene & { sys?: { game?: { device?: { os?: { android?: boolean; iOS?: boolean } } } } }).sys?.game?.device;
+    const isMobile = !!(device?.os?.android || device?.os?.iOS);
+    const momHeight = isMobile ? Math.min(280, Math.round(height * 0.38)) : 400;
+
     this.mom.showMomWithSpeech({
       x,
       y,
       depth: 400,
-      targetHeightPx: 400,
+      targetHeightPx: momHeight,
       speechText: "אוי ! עוד יומיים פסח , אני אשמח לעזרה לסדר את הבית !",
     });
 

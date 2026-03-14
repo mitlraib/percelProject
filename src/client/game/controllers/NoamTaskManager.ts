@@ -181,18 +181,18 @@ export default class NoamTaskManager {
     this.ui.cleanup();
     this.npc.hideAll();
 
-    // כישלון: קודם מריצים עונש, ורק כשהוא מסיים ממשיכים את שרשרת התור
     const onPenaltyDone = () => {
       this.unlockInternal();
       this.finishAndContinue();
     };
 
-    try {
-      this.opts.onFailPenalty(playerIndex, -3, onPenaltyDone);
-    } catch {
-      // אם משהו קרה ב־onFailPenalty, לפחות לא ניתקע
-      onPenaltyDone();
-    }
+    this.showToastCenter("לא הצלחת במשימה – חזרי 3 צעדים לאחור...", () => {
+      try {
+        this.opts.onFailPenalty(playerIndex, -3, onPenaltyDone);
+      } catch {
+        onPenaltyDone();
+      }
+    });
   }
 
   private lockInternal() {

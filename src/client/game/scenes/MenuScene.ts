@@ -34,10 +34,10 @@ export default class MenuScene extends Phaser.Scene {
 
     this.add.rectangle(width / 2, height / 2, width, height, 0x0b0b14).setDepth(0);
 
-    const titleY = isMobile ? 36 : 90;
-    const titleSize = isMobile ? (isPortrait ? 34 : 42) : 54;
-    const subTitleY = titleY + (isMobile ? 38 : 55);
-    const subTitleSize = isMobile ? 16 : 18;
+    const titleY = isMobile ? 22 : 90;
+    const titleSize = isMobile ? (isPortrait ? 26 : 34) : 54;
+    const subTitleY = titleY + (isMobile ? (isPortrait ? 26 : 32) : 55);
+    const subTitleSize = isMobile ? (isPortrait ? 13 : 15) : 18;
 
     this.add
       .text(width / 2, titleY, "✨ המסע לחתונה ✨", {
@@ -62,16 +62,16 @@ export default class MenuScene extends Phaser.Scene {
 
     const cols = isMobile && isPortrait ? 1 : 2;
     const horizontalPadding = isMobile ? 20 : 0;
-    const gap = isMobile ? 14 : 18;
+    const gap = isMobile ? (isPortrait ? 10 : 12) : 18;
     const cardW =
       cols === 1
         ? Math.min(420, width - horizontalPadding * 2)
         : Math.min(320, Math.floor(width * 0.42));
-    const cardH = isMobile ? 120 : 140;
+    const cardH = isMobile ? (isPortrait ? 88 : 100) : 140;
 
     const gridW = cols * cardW + (cols - 1) * gap;
     const startX = width / 2 - gridW / 2;
-    const startY = isMobile ? (isPortrait ? 118 : 150) : 220;
+    const startY = isMobile ? (isPortrait ? subTitleY + 20 : 130) : 220;
 
     const startGame = (count: number) => {
       const mode: "solo" | "local" = count === 1 ? "solo" : "local";
@@ -96,18 +96,22 @@ export default class MenuScene extends Phaser.Scene {
         .rectangle(0, 0, cardW, cardH, 0x16162a, 1)
         .setStrokeStyle(2, 0x2a2a44, 1);
 
+      const compactCard = isMobile && isPortrait;
+      const emojiY = compactCard ? -cardH / 2 + 10 : -cardH / 2 + 16;
+      const labelY = compactCard ? -cardH / 2 + 12 : -cardH / 2 + 18;
+      const descY = compactCard ? -cardH / 2 + 38 : -cardH / 2 + 48;
       const emoji = this.add
-        .text(-cardW / 2 + 18, -cardH / 2 + 16, opt.emoji, {
+        .text(-cardW / 2 + 18, emojiY, opt.emoji, {
           fontFamily: "Arial",
-          fontSize: isMobile ? "28px" : "32px",
+          fontSize: isMobile ? (compactCard ? "22px" : "28px") : "32px",
           color: "#ffffff",
         })
         .setOrigin(0, 0);
 
       const label = this.add
-        .text(-cardW / 2 + 68, -cardH / 2 + 18, opt.label, {
+        .text(-cardW / 2 + 68, labelY, opt.label, {
           fontFamily: "Arial",
-          fontSize: isMobile ? "17px" : "18px",
+          fontSize: isMobile ? (compactCard ? "15px" : "17px") : "18px",
           fontStyle: "bold",
           color: "#ffffff",
           rtl: true,
@@ -115,9 +119,9 @@ export default class MenuScene extends Phaser.Scene {
         .setOrigin(0, 0);
 
       const desc = this.add
-        .text(-cardW / 2 + 68, -cardH / 2 + 48, opt.desc, {
+        .text(-cardW / 2 + 68, descY, opt.desc, {
           fontFamily: "Arial",
-          fontSize: isMobile ? "13px" : "14px",
+          fontSize: isMobile ? (compactCard ? "11px" : "13px") : "14px",
           color: "#b7b7c9",
           wordWrap: { width: cardW - 90 },
           rtl: true,

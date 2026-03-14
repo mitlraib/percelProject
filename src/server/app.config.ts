@@ -12,11 +12,10 @@ import { MyRoom } from "./rooms/MyRoom.js";
 import { DuoRoom } from "./rooms/DuoRoom.js";
 
 const server = defineServer({
-  // מגדירים transport עם pingInterval / pingMaxRetries גדולים יותר,
-  // כדי שטאבים ברקע / מכשירים איטיים לא יתנתקו באמצע משימת אמא / הפאזל
+  // מגדירים transport עם pingInterval / pingMaxRetries גדולים – חוסר פעילות לא יגרום לניתוק
   transport: new WebSocketTransport({
-    pingInterval: 8000, // כל 8 שניות
-    pingMaxRetries: 10, // עד ~80 שניות בלי פינג לפני ניתוק
+    pingInterval: 30000, // פינג כל 30 שניות
+    pingMaxRetries: 20,  // עד ~10 דקות בלי תגובה לפני ניתוק (במקום שניות בודדות)
   }),
 
   rooms: {
