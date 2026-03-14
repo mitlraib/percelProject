@@ -31,14 +31,15 @@ export default class MenuScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const isMobile = !!(this.sys.game.device.os.android || this.sys.game.device.os.iOS);
     const isPortrait = height > width;
+    const isLandscape = isMobile && !isPortrait;
 
     this.add.rectangle(width / 2, height / 2, width, height, 0x0b0b14).setDepth(0);
 
-    // במובייל: כותרת ותת־כותרת קומפקטיות כדי שכל 4 האפשרויות ייכנסו במסך
-    const titleY = isMobile ? 14 : 90;
-    const titleSize = isMobile ? 22 : 54;
-    const subTitleY = titleY + (isMobile ? 20 : 55);
-    const subTitleSize = isMobile ? 12 : 18;
+    // במובייל: כותרת ותת־כותרת קומפקטיות; במאוזן עוד יותר למעלה
+    const titleY = isLandscape ? 8 : isMobile ? 14 : 90;
+    const titleSize = isLandscape ? 18 : isMobile ? 22 : 54;
+    const subTitleY = titleY + (isLandscape ? 14 : isMobile ? 20 : 55);
+    const subTitleSize = isLandscape ? 10 : isMobile ? 12 : 18;
 
     this.add
       .text(width / 2, titleY, "✨ המסע לחתונה ✨", {
@@ -61,18 +62,21 @@ export default class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // במובייל תמיד 2x2 (שתי שורות) כדי שהתפריט לא ייחתך – כל 4 האפשרויות גלויות
     const cols = 2;
     const horizontalPadding = isMobile ? 16 : 0;
     const gap = isMobile ? 8 : 18;
-    const cardW = Math.min(320, Math.floor((width - horizontalPadding * 2 - gap) / 2));
+    // במאוזן: כפתורים צרים יותר כדי שלא ייחתכו בצד
+    const maxCardW = isLandscape ? 220 : 320;
+    const cardW = Math.min(maxCardW, Math.floor((width - horizontalPadding * 2 - gap) / 2));
 
     const gridW = cols * cardW + (cols - 1) * gap;
-    const startX = width / 2 - gridW / 2;
-    const startY = isMobile ? subTitleY + 18 : 220;
+    // במאוזן: רשת צמודה לשמאל (מרווח 20px) כדי שכל הכפתורים ייכנסו ולא ייחתכו
+    const leftMargin = isLandscape ? 20 : 0;
+    const startX = isLandscape ? leftMargin + cardW / 2 : width / 2 - gridW / 2;
+    const startY = isLandscape ? subTitleY + 10 : isMobile ? subTitleY + 18 : 220;
     const bottomMargin = isMobile ? 28 : 0;
     const cardH = isMobile
-      ? Math.max(70, Math.min(92, Math.floor((height - startY - bottomMargin - gap) / 2)))
+      ? Math.max(isLandscape ? 62 : 70, Math.min(isLandscape ? 78 : 92, Math.floor((height - startY - bottomMargin - gap) / 2)))
       : 140;
 
     const startGame = (count: number) => {
@@ -99,21 +103,22 @@ export default class MenuScene extends Phaser.Scene {
         .setStrokeStyle(2, 0x2a2a44, 1);
 
       const compactCard = isMobile;
-      const emojiY = compactCard ? -cardH / 2 + 10 : -cardH / 2 + 16;
-      const labelY = compactCard ? -cardH / 2 + 12 : -cardH / 2 + 18;
-      const descY = compactCard ? -cardH / 2 + 38 : -cardH / 2 + 48;
+      const extraCompact = isLandscape;
+      const emojiY = extraCompact ? -cardH / 2 + 6 : compactCard ? -cardH / 2 + 10 : -cardH / 2 + 16;
+      const labelY = extraCompact ? -cardH / 2 + 8 : compactCard ? -cardH / 2 + 12 : -cardH / 2 + 18;
+      const descY = extraCompact ? -cardH / 2 + 28 : compactCard ? -cardH / 2 + 38 : -cardH / 2 + 48;
       const emoji = this.add
-        .text(-cardW / 2 + 18, emojiY, opt.emoji, {
+        .text(-cardW / 2 + (extraCompact ? 12 : 18), emojiY, opt.emoji, {
           fontFamily: "Arial",
-          fontSize: isMobile ? (compactCard ? "22px" : "28px") : "32px",
+          fontSize: extraCompact ? "18px" : isMobile ? (compactCard ? "22px" : "28px") : "32px",
           color: "#ffffff",
         })
         .setOrigin(0, 0);
 
       const label = this.add
-        .text(-cardW / 2 + 68, labelY, opt.label, {
+        .text(-cardW / 2 + (extraCompact ? 52 : 68), labelY, opt.label, {
           fontFamily: "Arial",
-          fontSize: isMobile ? (compactCard ? "15px" : "17px") : "18px",
+          fontSize: extraCompact ? "12px" : isMobile ? (compactCard ? "15px" : "17px") : "18px",
           fontStyle: "bold",
           color: "#ffffff",
           rtl: true,
@@ -121,11 +126,11 @@ export default class MenuScene extends Phaser.Scene {
         .setOrigin(0, 0);
 
       const desc = this.add
-        .text(-cardW / 2 + 68, descY, opt.desc, {
+        .text(-cardW / 2 + (extraCompact ? 52 : 68), descY, opt.desc, {
           fontFamily: "Arial",
-          fontSize: isMobile ? (compactCard ? "11px" : "13px") : "14px",
+          fontSize: extraCompact ? "9px" : isMobile ? (compactCard ? "11px" : "13px") : "14px",
           color: "#b7b7c9",
-          wordWrap: { width: cardW - 90 },
+          wordWrap: { width: cardW - (extraCompact ? 60 : 90) },
           rtl: true,
         })
         .setOrigin(0, 0);

@@ -74,7 +74,10 @@ export default class WorldBuilder {
     });
     this.plateauLayer = plateau.sprites;
 
-    const groundPathHeight = Math.max(height * 0.18, 80);
+    // במובייל: רצועת אדמה גבוהה יותר כדי לכסות את התחתית במאוזן (בלי ורוד)
+    const groundPathHeight = this.isMobileDevice()
+      ? Math.max(height * 0.28, 100)
+      : Math.max(height * 0.18, 80);
     const groundFullHeight = groundPathHeight + (height - groundY);
     const ground = this.buildRepeatedLayer({
       texture: "ground",
@@ -170,7 +173,9 @@ export default class WorldBuilder {
       depth: -300,
     });
 
-    const groundPathHeight = Math.max(height * 0.18, 80);
+    const groundPathHeight = this.isMobileDevice()
+      ? Math.max(height * 0.28, 100)
+      : Math.max(height * 0.18, 80);
     const groundFullHeight = groundPathHeight + (height - groundY);
     this.relayoutRepeatedLayer({
       sprites: this.groundLayer,

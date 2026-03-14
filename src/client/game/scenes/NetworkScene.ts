@@ -58,10 +58,12 @@ export default class NetworkScene extends Phaser.Scene {
   }
 
   async create() {
+    // ניקוי מצב קודם (לאחר התנתקות/חזרה לתפריט) – כדי שמשחק חדש יתחיל נקי
+    this.registry.remove("room");
+    this.registry.remove("net");
+
     // SOLO: מדלגים ישר למשחק
     if (this.mode === "solo") {
-      this.registry.remove("room");
-      this.registry.remove("net");
       this.scene.start("parallax-scene", { mode: this.mode, playerCount: this.playerCount });
       return;
     }

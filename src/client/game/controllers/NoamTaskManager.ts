@@ -136,7 +136,7 @@ export default class NoamTaskManager {
     const h = this.scene.scale.height;
     const device = (this.scene as Phaser.Scene & { sys?: { game?: { device?: { os?: { android?: boolean; iOS?: boolean } } } } }).sys?.game?.device;
     const isMobile = !!(device?.os?.android || device?.os?.iOS);
-    const noamH = isMobile ? Math.min(200, Math.round(h * 0.28)) : 400;
+    const noamH = isMobile ? Math.min(140, Math.round(h * 0.20)) : Math.min(580, Math.round(h * 0.64));
     this.npc.show({
       x,
       y,

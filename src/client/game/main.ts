@@ -12,9 +12,9 @@ export default function startGame() {
   const h = parent ? parent.clientHeight : window.innerHeight;
   const isMobile = w < MOBILE_BREAKPOINT;
 
-  // במובייל: גודל המשחק = גודל המסך (לא 800x450) כדי שהאדמה תהיה ממש בתחתית בלי פסים שחורים
+  // במובייל: גודל המשחק = גודל המסך בדיוק כדי שהאדמה תהיה בתחתית בלי פס ורוד/שחור (גם במאוזן)
   const gameW = isMobile ? Math.max(320, w) : Math.max(320, w);
-  const gameH = isMobile ? Math.max(400, h) : Math.max(240, h);
+  const gameH = isMobile ? h : Math.max(240, h);
 
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,

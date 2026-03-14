@@ -637,6 +637,11 @@ export default class ParallaxScene extends Phaser.Scene {
               console.log("[CLIENT] other player disconnected → back to menu", {
                 ts: Date.now(),
               });
+              try {
+                this.room?.leave();
+              } catch {}
+              this.registry.remove("room");
+              this.registry.remove("net");
               this.scene.start("menu-scene");
             });
           }
@@ -865,7 +870,7 @@ export default class ParallaxScene extends Phaser.Scene {
           const { width, height } = this.scale;
           const depth = 9000;
           const momH = this.isMobileDevice()
-            ? Math.min(220, Math.round(height * 0.32))
+            ? Math.min(160, Math.round(height * 0.22))
             : Math.min(440, Math.round(height * 0.55));
           const momX = width * 0.5;
           const momY = height * 0.72;
@@ -1042,7 +1047,7 @@ export default class ParallaxScene extends Phaser.Scene {
           const tex = dad.texture.getSourceImage() as HTMLImageElement;
           const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
           const targetH = this.isMobileDevice()
-            ? Math.min(220, Math.round(height * 0.32))
+            ? Math.min(160, Math.round(height * 0.22))
             : Math.min(420, Math.round(height * 0.55));
           dad.setDisplaySize(targetH * ratio, targetH);
 
@@ -1401,6 +1406,9 @@ export default class ParallaxScene extends Phaser.Scene {
     try {
       this.room?.leave();
     } catch {}
+
+    this.registry.remove("room");
+    this.registry.remove("net");
 
     this.scale.off("resize", this.handleResize, this);
 
