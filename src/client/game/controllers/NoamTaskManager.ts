@@ -54,7 +54,7 @@ export default class NoamTaskManager {
     return this.locked;
   }
 
-  /** מציג אצל שאר השחקנים: נועם עם הודעה "X עוזר לי כרגע... מיד יתפנה אליכן" ונעלם אחרי 3 שניות */
+
   showBusyMessage(playerName: string) {
     const { x, y } = this.opts.getStepWorldXY(27);
     this.npc.show({

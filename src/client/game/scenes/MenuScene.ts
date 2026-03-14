@@ -38,9 +38,9 @@ export default class MenuScene extends Phaser.Scene {
 
     this.add.rectangle(width / 2, height / 2, width, height, 0x0b0b14).setDepth(0);
 
-    const titleY = isMobile ? 56 : 90;
+    const titleY = isMobile ? 36 : 90;
     const titleSize = isMobile ? (isPortrait ? 34 : 42) : 54;
-    const subTitleY = titleY + (isMobile ? 42 : 55);
+    const subTitleY = titleY + (isMobile ? 38 : 55);
     const subTitleSize = isMobile ? 16 : 18;
 
     this.add
@@ -75,7 +75,7 @@ export default class MenuScene extends Phaser.Scene {
 
     const gridW = cols * cardW + (cols - 1) * gap;
     const startX = width / 2 - gridW / 2;
-    const startY = isMobile ? (isPortrait ? 150 : 170) : 220;
+    const startY = isMobile ? (isPortrait ? 118 : 150) : 220;
 
     const startGame = (count: number) => {
       const mode: "solo" | "local" = count === 1 ? "solo" : "local";

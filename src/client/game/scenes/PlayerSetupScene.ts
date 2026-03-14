@@ -30,18 +30,23 @@ export default class PlayerSetupScene extends Phaser.Scene {
 
     this.add.rectangle(width / 2, height / 2, width, height, 0x0b0b14).setDepth(0);
 
+    const isShort = height < 500;
+    const titleY = isShort ? 38 : 80;
+    const subTitleY = isShort ? 78 : 130;
+    const formTop = isShort ? 108 : 180;
+
     this.add
-      .text(width / 2, 80, "בחרי שם ותמונה לדמות שלך", {
+      .text(width / 2, titleY, "בחרי שם ותמונה לדמות שלך", {
         fontFamily: "Arial",
-        fontSize: "28px",
+        fontSize: isShort ? "24px" : "28px",
         color: "#ff66cc",
       })
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, 130, "השם יופיע כשזה התור שלך • התמונה תהיה הדמות על הלוח", {
+      .text(width / 2, subTitleY, "השם יופיע כשזה התור שלך • התמונה תהיה הדמות על הלוח", {
         fontFamily: "Arial",
-        fontSize: "16px",
+        fontSize: isShort ? "14px" : "16px",
         color: "#b7b7c9",
       })
       .setOrigin(0.5);
@@ -49,12 +54,12 @@ export default class PlayerSetupScene extends Phaser.Scene {
     this.wrapDiv = document.createElement("div");
     this.wrapDiv.style.position = "absolute";
     this.wrapDiv.style.left = "50%";
-    this.wrapDiv.style.top = "180px";
+    this.wrapDiv.style.top = `${formTop}px`;
     this.wrapDiv.style.transform = "translateX(-50%)";
     this.wrapDiv.style.width = "min(90vw, 360px)";
     this.wrapDiv.style.display = "flex";
     this.wrapDiv.style.flexDirection = "column";
-    this.wrapDiv.style.gap = "20px";
+    this.wrapDiv.style.gap = isShort ? "12px" : "20px";
     this.wrapDiv.style.alignItems = "stretch";
     this.wrapDiv.style.zIndex = "10000";
 
@@ -100,15 +105,15 @@ export default class PlayerSetupScene extends Phaser.Scene {
     const btn = document.createElement("button");
     btn.textContent = "התחל משחק";
     btn.type = "button";
-    btn.style.padding = "14px 24px";
-    btn.style.fontSize = "20px";
+    btn.style.padding = isShort ? "12px 24px" : "14px 24px";
+    btn.style.fontSize = isShort ? "18px" : "20px";
     btn.style.fontWeight = "bold";
     btn.style.borderRadius = "12px";
     btn.style.border = "none";
     btn.style.background = "#ff66cc";
     btn.style.color = "#0b0b14";
     btn.style.cursor = "pointer";
-    btn.style.marginTop = "10px";
+    btn.style.marginTop = isShort ? "4px" : "10px";
     btn.onclick = () => this.onStart();
     this.wrapDiv.appendChild(btn);
 

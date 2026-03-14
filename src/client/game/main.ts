@@ -17,7 +17,7 @@ export default function startGame() {
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     parent: "game-container",
-    backgroundColor: "#222222",
+    backgroundColor: "#0b0b14",
 
     scale: {
       mode: isMobile ? Phaser.Scale.FIT : Phaser.Scale.RESIZE,

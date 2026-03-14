@@ -173,6 +173,9 @@ export default class ParallaxScene extends Phaser.Scene {
     this.cursors = this.input.keyboard!.createCursorKeys();
 
     const layout = this.layoutMgr.compute(this.scale.width, this.scale.height);
+    if (this.isMobileDevice()) {
+      layout.groundOffsetY = Math.round(this.scale.height * 0.03);
+    }
     this.applyLayoutValues(layout);
 
     this.world = new WorldBuilder(this);
@@ -487,6 +490,9 @@ export default class ParallaxScene extends Phaser.Scene {
     });
 
     const layout = this.layoutMgr.compute(gameSize.width, gameSize.height);
+    if (this.isMobileDevice()) {
+      layout.groundOffsetY = Math.round(gameSize.height * 0.03);
+    }
     this.applyLayoutValues(layout);
 
     const worldResult = this.world?.resize({
@@ -850,15 +856,72 @@ export default class ParallaxScene extends Phaser.Scene {
         const name = this.getPlayerDisplayName(playerIndex);
 
         if (type === "mom") {
-          const { x, y } = this.getStepWorldXY(10);
-          this.momCtl.showMomWithSpeech({
-            x,
-            y,
-            depth: 400,
-            targetHeightPx: 400,
-            speechText: `${name} עוזר/ת לי כרגע... מיד יתפנה אליכן.`,
+          const { width, height } = this.scale;
+          const depth = 9000;
+          const momH = Math.min(380, height * 0.5);
+          const momX = width * 0.5;
+          const momY = height * 0.72;
+
+          const momImg = this.add
+            .image(momX, momY, "MOM")
+            .setOrigin(0.5, 1)
+            .setScrollFactor(0)
+            .setDepth(depth);
+
+          const tex = momImg.texture.getSourceImage() as HTMLImageElement;
+          const ratio = tex?.width && tex?.height ? tex.width / tex.height : 1;
+          momImg.setDisplaySize(momH * ratio, momH);
+
+          const bubbleW = Math.min(520, width * 0.85);
+          const speechText = `${name} עוזר/ת לי כרגע... מיד תתפנה אליכן.`;
+          const label = this.add
+            .text(0, 0, speechText, {
+              fontFamily: "Arial",
+              fontSize: "20px",
+              color: "#111",
+              align: "right",
+              wordWrap: { width: bubbleW - 32, useAdvancedWrap: true },
+            })
+            .setOrigin(0.5, 0.5);
+
+          const padX = 18;
+          const padY = 14;
+          const bg = this.add.graphics();
+          const bw = label.width + padX * 2;
+          const bh = label.height + padY * 2;
+          bg.fillStyle(0xffffff, 1);
+          bg.lineStyle(2, 0x111111, 0.9);
+          bg.fillRoundedRect(-bw / 2, -bh / 2, bw, bh, 16);
+          bg.strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, 16);
+
+          const bubble = this.add
+            .container(width * 0.5, height * 0.38, [bg, label])
+            .setScrollFactor(0)
+            .setDepth(depth + 1);
+
+          momImg.setAlpha(0);
+          bubble.setAlpha(0);
+
+          this.tweens.add({
+            targets: [momImg, bubble],
+            alpha: 1,
+            duration: 220,
+            ease: "Sine.easeOut",
           });
-          this.time.delayedCall(3000, () => this.momCtl.hideAnimated());
+
+          const showMs = 5500;
+          this.time.delayedCall(showMs, () => {
+            this.tweens.add({
+              targets: [momImg, bubble],
+              alpha: 0,
+              duration: 200,
+              ease: "Sine.easeIn",
+              onComplete: () => {
+                momImg.destroy();
+                bubble.destroy();
+              },
+            });
+          });
         } else if (type === "noam") {
           this.noamTasks.showBusyMessage(name);
         } else {
@@ -909,7 +972,7 @@ export default class ParallaxScene extends Phaser.Scene {
             .text(
               0,
               0,
-              `${name} עוזר/ת לי כרגע לסדר את השולחנות... מיד יתפנה אליכן.`,
+              `${name} עוזר/ת לי כרגע לסדר את השולחנות... מיד תתפנה אליכן.`,
               {
                 fontFamily: "Arial",
                 fontSize: "18px",
