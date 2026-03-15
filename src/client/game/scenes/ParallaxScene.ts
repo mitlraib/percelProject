@@ -17,7 +17,6 @@ import ParallaxLayoutManager from "./parallax/ParallaxLayoutManager";
 import ParallaxHudController from "./parallax/ParallaxHudController";
 import ParallaxTaskFlowController from "./parallax/ParallaxTaskFlowController";
 import ParallaxModeController from "./parallax/ParallaxModeController";
-import { ParallaxMovementController } from "./parallax/ParallaxMovementController";
 import ParallaxOverlayController from "./parallax/ParallaxOverlayController";
 
 import type {
@@ -700,5 +699,101 @@ export default class ParallaxScene extends Phaser.Scene {
 
     if (this.cursors.left?.isDown) cam.scrollX -= speed;
     else if (this.cursors.right?.isDown) cam.scrollX += speed;
+  }
+}
+
+/** מוגדר כאן (באותו קובץ) כדי שבדיפלוי הבандלר לא יגרום ל־"is not a constructor". */
+type MovementControllerOpts = {
+  moveMs: number;
+  getLaneStartX: () => number;
+  getStepSizePx: () => number;
+  getMyIndex: () => number | null;
+  refreshHUD: () => void;
+};
+
+class ParallaxMovementController {
+  constructor(
+    private scene: Phaser.Scene,
+    private players: PlayerManager,
+    private camCtl: CameraController,
+    private ui: SceneUI,
+    private tasks: TaskManager,
+    private noamTasks: NoamTaskManager,
+    private taskFlow: ParallaxTaskFlowController,
+    private opts: MovementControllerOpts
+  ) {}
+
+  playMoveTurn(
+    playerIndex: number,
+    diceValue: number,
+    onTurnFinished?: () => void
+  ) {
+    this.ui.setLastRoll(diceValue);
+    this.ui.setMoving(true);
+
+    this.players.moveByDice({
+      playerIndex,
+      diceValue,
+      laneStartX: this.opts.getLaneStartX(),
+      stepSizePx: this.opts.getStepSizePx(),
+      maxX: this.camCtl.getMaxXPadding(40),
+      duration: this.opts.moveMs,
+      onComplete: () => {
+        this.ui.setMoving(false);
+
+        const stepsNow = this.players.getSteps(playerIndex);
+
+        this.tasks.handleAfterMove(playerIndex, stepsNow, () => {
+          this.taskFlow.handleWeddingSeatingAfterMove(
+            playerIndex,
+            stepsNow,
+            () => {
+              this.noamTasks.handleAfterMove(playerIndex, stepsNow, () => {
+                const followIdx = this.opts.getMyIndex() ?? 0;
+
+                this.opts.refreshHUD();
+
+                this.scene.time.delayedCall(100, () => {
+                  this.camCtl.follow(this.players.getContainer(followIdx));
+                });
+
+                this.ui.flushPendingDiceVisibility();
+                onTurnFinished?.();
+              });
+            }
+          );
+        });
+      },
+    });
+  }
+
+  playPenaltyMove(
+    playerIndex: number,
+    deltaSteps: number,
+    done?: () => void
+  ) {
+    this.ui.setMoving(true);
+
+    this.players.moveByDice({
+      playerIndex,
+      diceValue: deltaSteps,
+      laneStartX: this.opts.getLaneStartX(),
+      stepSizePx: this.opts.getStepSizePx(),
+      maxX: this.camCtl.getMaxXPadding(40),
+      duration: 1300,
+      ease: "Sine.easeInOut",
+      onComplete: () => {
+        this.ui.setMoving(false);
+
+        const followIdx = this.opts.getMyIndex() ?? 0;
+
+        this.scene.time.delayedCall(80, () => {
+          this.camCtl.follow(this.players.getContainer(followIdx));
+        });
+
+        this.opts.refreshHUD();
+        done?.();
+      },
+    });
   }
 }
