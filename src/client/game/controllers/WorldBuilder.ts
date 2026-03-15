@@ -37,12 +37,10 @@ export default class WorldBuilder {
   }
 
   private getDefaultGroundOffsetY(): number {
-    const h = this.scene.scale.height;
-
     if (this.isMobileDevice()) {
-      return Math.round(h * 0.07);
+      return 0;
     }
-
+    const h = this.scene.scale.height;
     return Math.round(h * 0.15);
   }
 

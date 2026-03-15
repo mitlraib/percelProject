@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" href="../../favicon.png" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no"
+  />
   <title>Phaser - Template</title>
 
   <style>
@@ -15,6 +18,7 @@
       height: 100%;
       overflow: hidden;
       background: #0b0b14;
+      touch-action: manipulation;
     }
 
     body {
@@ -22,7 +26,8 @@
     }
 
     #app {
-      position: relative;
+      position: fixed;
+      inset: 0;
       width: 100vw;
       height: 100dvh;
       overflow: hidden;
@@ -36,12 +41,14 @@
       width: 100vw;
       height: 100dvh;
       overflow: hidden;
-      box-sizing: border-box;
       background: #0b0b14;
+      box-sizing: border-box;
     }
 
     #game-container canvas {
       display: block;
+      width: 100% !important;
+      height: 100% !important;
     }
 
     #fullscreen-btn {

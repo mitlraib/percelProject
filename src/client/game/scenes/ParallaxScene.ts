@@ -17,7 +17,7 @@ import ParallaxLayoutManager from "./parallax/ParallaxLayoutManager";
 import ParallaxHudController from "./parallax/ParallaxHudController";
 import ParallaxTaskFlowController from "./parallax/ParallaxTaskFlowController";
 import ParallaxModeController from "./parallax/ParallaxModeController";
-import ParallaxMovementController from "./parallax/ParallaxMovementController";
+import { ParallaxMovementController } from "./parallax/ParallaxMovementController";
 import ParallaxOverlayController from "./parallax/ParallaxOverlayController";
 
 import type {
@@ -462,13 +462,17 @@ export default class ParallaxScene extends Phaser.Scene {
       if (this.tasks.isLocked() || this.noamTasks.isLocked()) return;
       if (this.taskFlow.hasActiveSeatingTask()) return;
 
-      if (this.mode === "solo") return;
+      if (this.mode === "solo") {
+        this.ui.dice.playVisualRoll(value, 600);
+        return;
+      }
 
       if (this.net) {
         this.modeCtl.handleDiceRoll(value);
         return;
       }
 
+      this.ui.dice.playVisualRoll(value, 600);
       this.movementCtl.playMoveTurn(0, value);
     });
 

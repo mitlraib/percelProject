@@ -5,7 +5,8 @@
   "source": "index.html",
   "scripts": {
     "dev": "parcel index.html --open",
-    "build": "parcel build index.html --public-url ./"
+    "build": "parcel build index.html --public-url ./ --no-cache",
+    "clean": "node -e \"const fs=require('fs'); const p='.parcel-cache'; if(fs.existsSync(p)){ fs.rmSync(p,{recursive:true}); console.log('Removed .parcel-cache'); } const d='dist'; if(fs.existsSync(d)){ fs.rmSync(d,{recursive:true}); console.log('Removed dist'); }\""
   },
   "dependencies": {
     "@colyseus/sdk": "^0.17.33",

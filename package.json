@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix src/server\" \"npm run dev --prefix src/client\"",
     "build": "npm run build --prefix src/client",
-    "start": "npm run start --prefix src/server"
+    "start": "npm run start --prefix src/server",
+    "clean": "npm run clean --prefix src/client",
+    "clean:build": "npm run clean && npm run build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

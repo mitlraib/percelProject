@@ -4,7 +4,8 @@ import type { LayoutMetrics } from "./ParallaxTypes";
 export default class ParallaxLayoutManager {
   compute(width: number, height: number): LayoutMetrics {
     const safeWidth = Math.max(width, 320);
-    const safeHeight = Math.max(height, 480);
+    // לא להגדיל את הגובה – במובייל מאוזן הגובה קטן, האדמה חייבת להישאר בתחתית המסך
+    const safeHeight = Math.max(height, 240);
 
     const laneStartX = Math.round(safeWidth * 0.1);
     const stepSizePx = Math.round(

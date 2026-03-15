@@ -28,14 +28,12 @@ export default function startGame() {
     type: Phaser.AUTO,
     parent: "game-container",
     backgroundColor: "#0b0b14",
-
     scale: {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
       width,
       height,
     },
-
     physics: {
       default: "arcade",
       arcade: {
@@ -43,7 +41,6 @@ export default function startGame() {
         debug: false,
       },
     },
-
     scene: [MenuScene, PlayerSetupScene, NetworkScene, ParallaxScene],
   };
 
@@ -62,17 +59,27 @@ export default function startGame() {
       : Math.max(240, nextViewport.height);
 
     game.scale.resize(nextWidth, nextHeight);
-    game.canvas.style.width = `${nextWidth}px`;
-    game.canvas.style.height = `${nextHeight}px`;
+
+    if (game.canvas) {
+      game.canvas.style.width = `${nextWidth}px`;
+      game.canvas.style.height = `${nextHeight}px`;
+      game.canvas.style.display = "block";
+    }
   };
 
-  window.addEventListener("resize", syncGameSize);
-  window.addEventListener("orientationchange", () => {
-    window.setTimeout(syncGameSize, 120);
-  });
-  window.visualViewport?.addEventListener("resize", syncGameSize);
+  const delayedSync = () => {
+    syncGameSize();
+    window.setTimeout(syncGameSize, 80);
+    window.setTimeout(syncGameSize, 180);
+    window.setTimeout(syncGameSize, 320);
+  };
 
-  syncGameSize();
+  window.addEventListener("resize", delayedSync);
+  window.addEventListener("orientationchange", delayedSync);
+  window.addEventListener("fullscreenchange", delayedSync);
+  window.visualViewport?.addEventListener("resize", delayedSync);
+
+  delayedSync();
 
   return game;
 }
