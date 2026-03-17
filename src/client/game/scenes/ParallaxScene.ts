@@ -664,6 +664,14 @@ export default class ParallaxScene extends Phaser.Scene {
       myPlayerIndex: this.myPlayerIndex,
       currentTurnName: this.currentTurnName,
     });
+
+    // לעדכן את השמות שמתחת לדמויות לפי הכינויים העדכניים (כמו שכתוב "תור של ...")
+    if (this.players) {
+      const names = Array.from({ length: this.playerCount }, (_, i) =>
+        this.getPlayerDisplayName(i)
+      );
+      this.players.setPlayerNames(names);
+    }
   }
 
   /** אחרי שכל המשימות (אמא, אבא, נועם) טופלו – בודקים אם צריך להציג את השאלה הסופית. */

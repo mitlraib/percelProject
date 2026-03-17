@@ -78,7 +78,7 @@ export default class WeddingSeatingBoardView {
       .setDepth(this.depth + 2);
 
     const rulesX = mobile
-      ? panel.x + panel.width / 2 - 12
+      ? panel.x + panel.width / 2 - 28
       : width / 2;
 
     const rulesY = mobile
@@ -173,7 +173,7 @@ export default class WeddingSeatingBoardView {
     const rows = Math.ceil(this.canon.tablesCount / cols);
 
     const gridCenterX = mobile ? panel.x - 44 : panel.x;
-    const gridCenterY = mobile ? panel.y + 118 : panel.y + 20;
+    const gridCenterY = mobile ? panel.y + 92 : panel.y + 20;
 
     const gapX = mobile ? 128 : 180;
     const gapY = mobile ? 112 : 145;
