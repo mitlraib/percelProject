@@ -55,11 +55,16 @@ export default class WeddingSeatingGuestsController {
 
     const perSide = Math.ceil(guests.length / 2);
 
-    const sideInset = mobile ? 48 : 95;
-    const leftX = panel.x - panel.width / 2 + sideInset;
-    const rightX = panel.x + panel.width / 2 - sideInset;
+    const sideOffsetOutside = mobile ? 22 : 0;
+    const leftX = mobile
+      ? panel.x - panel.width / 2 - sideOffsetOutside
+      : panel.x - panel.width / 2 + 95;
 
-    const startY = mobile ? panel.y - 118 : panel.y - 115;
+    const rightX = mobile
+      ? panel.x + panel.width / 2 + sideOffsetOutside
+      : panel.x + panel.width / 2 - 95;
+
+    const startY = mobile ? panel.y - 124 : panel.y - 115;
     const gapY = mobile ? 46 : 52;
 
     guests.forEach((guest, index) => {

@@ -328,6 +328,9 @@ export default class ParallaxModeController {
         ? s.names.map((n, i) => n ?? fallbackNames[i] ?? "שחקן")
         : fallbackNames;
 
+    // נעדכן גם את השמות שמופיעים מתחת לדמויות בלוח
+    this.players.setPlayerNames(names);
+
     const emojis = ["👧", "🐶", "🐻", "🎮"];
     const me = this.opts.getMyIndex();
 
