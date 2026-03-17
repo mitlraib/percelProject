@@ -66,6 +66,7 @@ export default class WeddingSeatingBoardView {
     const panelTop = panel.y - panel.height / 2;
 
     const titleY = mobile ? panelTop + 10 : panelTop + 16;
+
     const titleText = this.scene.add
       .text(width / 2, titleY, "סידור שולחנות", {
         fontFamily: "Arial",
@@ -121,6 +122,7 @@ export default class WeddingSeatingBoardView {
       .setDepth(this.depth + 2);
 
     const statusY = panel.y + panel.height / 2 - (mobile ? 56 : 72);
+
     const statusText = this.scene.add
       .text(width / 2, statusY, "גררי את האורחים לשולחנות", {
         fontFamily: "Arial",
@@ -138,7 +140,9 @@ export default class WeddingSeatingBoardView {
     root.setScrollFactor(0);
 
     const seats = this.createTables(root, panel, this.depth + 2);
-    const { submitBtnBg, submitBtnLabel } = this.createButtons(panel, onSubmit, this.depth + 20);
+
+    const { submitBtnBg, submitBtnLabel } =
+      this.createButtons(panel, onSubmit, this.depth + 20);
 
     return {
       root,
@@ -158,6 +162,7 @@ export default class WeddingSeatingBoardView {
     const lines = this.canon.rules.map(
       (rule, index) => `${index + 1}. ${rule.reason.replace("❌ ", "")}`
     );
+
     return ["חוקים:", ...lines].join("\n");
   }
 
@@ -166,6 +171,7 @@ export default class WeddingSeatingBoardView {
     panel: Phaser.GameObjects.Rectangle,
     depth: number
   ): SeatView[] {
+
     const seats: SeatView[] = [];
     const mobile = this.isMobile();
 
@@ -173,7 +179,7 @@ export default class WeddingSeatingBoardView {
     const rows = Math.ceil(this.canon.tablesCount / cols);
 
     const gridCenterX = mobile ? panel.x - 8 : panel.x;
-    const gridCenterY = mobile ? panel.y + 74 : panel.y + 20;
+    const gridCenterY = mobile ? panel.y + 58 : panel.y + 20;
 
     const gapX = mobile ? 128 : 180;
     const gapY = mobile ? 112 : 145;
@@ -193,6 +199,7 @@ export default class WeddingSeatingBoardView {
     const labelOffset = mobile ? -42 : -54;
 
     for (let t = 0; t < this.canon.tablesCount; t++) {
+
       const col = t % cols;
       const row = Math.floor(t / cols);
 
@@ -225,6 +232,7 @@ export default class WeddingSeatingBoardView {
       ];
 
       for (let s = 0; s < this.canon.seatsPerTable; s++) {
+
         const pos = seatPositions[s];
 
         const bg = this.scene.add
@@ -260,7 +268,9 @@ export default class WeddingSeatingBoardView {
     onSubmit: () => void,
     depth: number
   ) {
+
     const mobile = this.isMobile();
+
     const buttonY = panel.y + panel.height / 2 - (mobile ? 30 : 32);
 
     const submitBtnBg = this.scene.add
