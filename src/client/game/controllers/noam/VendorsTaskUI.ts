@@ -204,8 +204,8 @@ export default class VendorsTaskUI {
 
     const w = this.scene.scale.width;
     const h = this.scene.scale.height;
-    // מיקום התיבה בדיוק מעל האזור הגרפי של השדה בפאנל (root במרכז, אזור הקלט ב־y≈19)
-    const inputCenterY = h / 2 + 19;
+    // במובייל: תיבת הטקסט במרכז המסך וגבוהה enough כדי שיהיה נראה (מעל המקלדת)
+    const inputCenterY = Math.round(h * 0.38);
     input.style.position = "fixed";
     input.style.left = `${w / 2}px`;
     input.style.top = `${inputCenterY}px`;

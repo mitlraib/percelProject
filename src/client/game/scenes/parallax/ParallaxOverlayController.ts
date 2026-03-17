@@ -170,7 +170,7 @@ export default class ParallaxOverlayController {
     const bg = this.scene.add.graphics();
     const bw = label.width + padX * 2;
     const bh = label.height + padY * 2;
-    const gapAboveMom = 18;
+    const gapAboveMom = this.opts.isMobileDevice() ? 6 : 18;
     const tailH = 20;
     const tailW = 14;
 
@@ -254,7 +254,7 @@ export default class ParallaxOverlayController {
     const bg = this.scene.add.graphics();
     const bw = label.width + padX * 2;
     const bh = label.height + padY * 2;
-    const gapAbove = 18;
+    const gapAbove = this.opts.isMobileDevice() ? 6 : 18;
     const tailH = 18;
     const tailW = 12;
 
@@ -361,8 +361,9 @@ export default class ParallaxOverlayController {
       )
       .setOrigin(0.5);
 
+    const bubbleY = this.opts.isMobileDevice() ? height * 0.58 : height * 0.45;
     const bubble = this.scene.add
-      .container(width * 0.6, height * 0.45, [bg, tail, label])
+      .container(width * 0.6, bubbleY, [bg, tail, label])
       .setScrollFactor(0)
       .setDepth(9001);
 
