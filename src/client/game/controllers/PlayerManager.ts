@@ -11,6 +11,7 @@ export default class PlayerManager {
   private containers: Phaser.GameObjects.Container[] = [];
   private sprites: Phaser.GameObjects.Image[] = [];
   private totalTexts: Phaser.GameObjects.Text[] = [];
+  private nameTexts: Phaser.GameObjects.Text[] = [];
   private steps: number[] = [];
   private tweens: Array<Phaser.Tweens.Tween | null> = [];
 
@@ -31,6 +32,7 @@ export default class PlayerManager {
     this.containers = [];
     this.sprites = [];
     this.totalTexts = [];
+    this.nameTexts = [];
     this.steps = [];
     this.tweens = [];
     this.laneOffsets = [];
@@ -69,13 +71,24 @@ export default class PlayerManager {
         })
         .setOrigin(0.5, 0.5);
 
+      const nameFontPx = Math.max(14, Math.round(this.targetHeight * 0.22));
+      const nameText = this.scene.add
+        .text(0, Math.max(6, this.targetHeight * 0.12), "", {
+          fontFamily: "Arial",
+          fontSize: `${nameFontPx}px`,
+          color: "#000000",
+          align: "center",
+        })
+        .setOrigin(0.5, 0);
+
       const container = this.scene.add
-        .container(this.laneStartX, y, [img, totalText])
+        .container(this.laneStartX, y, [img, totalText, nameText])
         .setDepth(this.depth);
 
       this.containers.push(container);
       this.sprites.push(img);
       this.totalTexts.push(totalText);
+      this.nameTexts.push(nameText);
       this.steps.push(0);
       this.tweens.push(null);
     });
@@ -103,6 +116,7 @@ export default class PlayerManager {
     this.containers.forEach((container, i) => {
       const sprite = this.sprites[i];
       const totalText = this.totalTexts[i];
+      const nameText = this.nameTexts[i];
       const offset = this.laneOffsets[i] ?? 0;
 
       container.y = this.groundY - offset;
@@ -113,6 +127,12 @@ export default class PlayerManager {
       const fontPx = Math.max(14, Math.round(this.targetHeight * 0.22));
       totalText.setStyle({ fontSize: `${fontPx}px` });
       totalText.setPosition(0, -sprite.displayHeight - Math.max(8, this.targetHeight * 0.08));
+
+      if (nameText) {
+        const nameFontPx = Math.max(14, Math.round(this.targetHeight * 0.22));
+        nameText.setStyle({ fontSize: `${nameFontPx}px` });
+        nameText.setPosition(0, Math.max(6, this.targetHeight * 0.12));
+      }
 
       const steps = this.steps[i] ?? 0;
       const targetX = this.laneStartX + steps * opts.stepSizePx;
@@ -159,6 +179,16 @@ export default class PlayerManager {
 
   getSprites() {
     return this.sprites;
+  }
+
+  /** מציב שמות מתחת לכל שחקן לפי אינדקס. */
+  setPlayerNames(names: string[]) {
+    names.forEach((name, i) => {
+      const t = this.nameTexts[i];
+      if (t) {
+        t.setText(name);
+      }
+    });
   }
 
   getSteps(index: number) {

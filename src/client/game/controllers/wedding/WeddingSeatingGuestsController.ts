@@ -29,23 +29,38 @@ export default class WeddingSeatingGuestsController {
   }
 
   private isMobile(): boolean {
-    const device = (this.scene as Phaser.Scene & { sys: { game: { device?: { os?: { android?: boolean; iOS?: boolean } } } } }).sys?.game?.device;
-    return !!(device?.os?.android || device?.os?.iOS);
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+
+    const device = (
+      this.scene as Phaser.Scene & {
+        sys: {
+          game: {
+            device?: { os?: { android?: boolean; iOS?: boolean } };
+          };
+        };
+      }
+    ).sys?.game?.device;
+
+    return !!(device?.os?.android || device?.os?.iOS || width <= 900 || height <= 700);
   }
 
   build(panel: Phaser.GameObjects.Rectangle) {
     const guests = this.canon.guests;
     const mobile = this.isMobile();
 
-    const cardW = mobile ? 98 : 120;
-    const cardH = mobile ? 32 : 36;
-    const perSide = Math.ceil(guests.length / 2);
-    const margin = mobile ? 62 : 95;
-    const leftX = panel.x - panel.width / 2 + margin;
-    const rightX = panel.x + panel.width / 2 - margin;
+    const cardW = mobile ? 82 : 120;
+    const cardH = mobile ? 28 : 36;
+    const labelFontSize = mobile ? "10px" : "13px";
 
-    const startY = panel.y - (mobile ? 92 : 115);
-    const gapY = mobile ? 38 : 52;
+    const perSide = Math.ceil(guests.length / 2);
+
+    const sideInset = mobile ? 48 : 95;
+    const leftX = panel.x - panel.width / 2 + sideInset;
+    const rightX = panel.x + panel.width / 2 - sideInset;
+
+    const startY = mobile ? panel.y - 118 : panel.y - 115;
+    const gapY = mobile ? 46 : 52;
 
     guests.forEach((guest, index) => {
       const isLeft = index < perSide;
@@ -63,17 +78,17 @@ export default class WeddingSeatingGuestsController {
 
       const bg = this.scene.add
         .rectangle(0, 0, cardW, cardH, bgColor, 1)
-        .setStrokeStyle(2, 0x4b2e2e);
+        .setStrokeStyle(mobile ? 1.5 : 2, 0x4b2e2e);
 
       const label = this.scene.add
         .text(0, 0, guest.label, {
           fontFamily: "Arial",
-          fontSize: "13px",
+          fontSize: labelFontSize,
           color: "#2d2d2d",
           fontStyle: "bold",
           rtl: true,
           align: "center",
-          wordWrap: { width: cardW - 12 },
+          wordWrap: { width: cardW - (mobile ? 10 : 12) },
         })
         .setOrigin(0.5);
 
@@ -89,7 +104,7 @@ export default class WeddingSeatingGuestsController {
         .setDepth(this.opts.depth + 1)
         .setSize(cardW, cardH)
         .setInteractive(
-          new Phaser.Geom.Rectangle(0, 0, cardW, cardH),
+          new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH),
           Phaser.Geom.Rectangle.Contains
         );
 
@@ -120,11 +135,12 @@ export default class WeddingSeatingGuestsController {
 
   private setupGuestDrag(card: GuestCardWithDragZone) {
     const dragTarget = card.dragZone;
+    const mobile = this.isMobile();
 
     dragTarget.on("dragstart", () => {
       if (this.opts.finished()) return;
 
-      card.container.setScale(1.08);
+      card.container.setScale(mobile ? 1.06 : 1.08);
       card.container.setDepth(999999);
       card.dragZone.setDepth(1000000);
       this.highlightAllSeats(true);
@@ -161,7 +177,7 @@ export default class WeddingSeatingGuestsController {
   }
 
   private findSeatUnderCard(card: GuestCardWithDragZone): SeatView | null {
-    const snapDistance = 34;
+    const snapDistance = this.isMobile() ? 30 : 34;
 
     let bestSeat: SeatView | null = null;
     let bestDistance = Number.POSITIVE_INFINITY;
@@ -183,29 +199,28 @@ export default class WeddingSeatingGuestsController {
   private placeCardInSeat(card: GuestCardWithDragZone, tableId: number, seatIndex: number) {
     const seatValue = this.opts.tables[tableId].seatGuestIds[seatIndex];
 
-    // אם יש שם אורח אחר – נבצע "החלפה" ביניהם במקום לחסום לגמרי.
     if (seatValue && seatValue !== card.guest.id) {
       const otherCard = this.guestCards.find(
         (c) => c.currentSeat?.tableId === tableId && c.currentSeat?.seatIndex === seatIndex
       );
 
       if (otherCard) {
-        // משחררים את המקום הקודם של האורח הנגרר
         const prevSeat = card.currentSeat;
         this.removeGuestFromCurrentSeat(card);
 
-        // מעדכנים את המערך הטבלאות עבור שני האורחים
         if (prevSeat) {
           this.opts.tables[prevSeat.tableId].seatGuestIds[prevSeat.seatIndex] = otherCard.guest.id;
         }
+
         this.opts.tables[tableId].seatGuestIds[seatIndex] = card.guest.id;
 
-        // מעבירים את האורח השני למקום הקודם (או הביתה אם לא היה לו מקום)
         if (prevSeat) {
           otherCard.currentSeat = { tableId: prevSeat.tableId, seatIndex: prevSeat.seatIndex };
+
           const prevSeatView = this.opts.seats.find(
             (s) => s.tableId === prevSeat.tableId && s.seatIndex === prevSeat.seatIndex
           );
+
           if (prevSeatView) {
             this.tweenCardTo(otherCard, prevSeatView.x, prevSeatView.y);
           } else {
@@ -213,24 +228,18 @@ export default class WeddingSeatingGuestsController {
             this.tweenCardTo(otherCard, otherCard.homeX, otherCard.homeY);
           }
         } else {
-          // אם לא היה מקום קודם – האורח השני חוזר לרשימת האורחים
-          this.opts.tables[tableId].seatGuestIds[seatIndex] = card.guest.id;
-          this.opts.statusText.setColor("#2d4a22");
-          this.opts.statusText.setText("✔️ החלפתם בין אורחים");
-
-          this.opts.tables[tableId].seatGuestIds[seatIndex] = card.guest.id;
           otherCard.currentSeat = null;
           this.tweenCardTo(otherCard, otherCard.homeX, otherCard.homeY);
+          this.opts.statusText.setColor("#2d4a22");
+          this.opts.statusText.setText("✔️ החלפתם בין אורחים");
         }
       } else {
-        // במקרה קצה – נ fallback להתנהגות הישנה
         this.opts.statusText.setColor("#b00020");
         this.opts.statusText.setText("❌ המקום הזה כבר תפוס");
         this.moveCardToSeatOrHome(card);
         return;
       }
     } else {
-      // המקום ריק או זה אותו אורח – פשוט מעבירים אליו
       this.removeGuestFromCurrentSeat(card);
       this.opts.tables[tableId].seatGuestIds[seatIndex] = card.guest.id;
     }

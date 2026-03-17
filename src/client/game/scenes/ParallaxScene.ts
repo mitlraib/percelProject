@@ -77,12 +77,18 @@ export default class ParallaxScene extends Phaser.Scene {
   // תמונת אווטאר מקומית (לא עוברת דרך השרת, רק אצל השחקן עצמו)
   private localAvatarDataUrl: string | null = null;
 
-  private readonly fixedDiceSeqPlayer0 = [5, 2, 3, 5, 6, 6];
+  // רצף קבוע עבור קלי:
+  // 5,2,3,3,2,5,3,4,3 => 5 → 7 → 10 (אמא) → 13 → 15 (אבא) → 20 → 23 → 27 (נועם) → 30 (סיום)
+  private readonly fixedDiceSeqPlayer0 = [5, 2, 3, 3, 2, 5, 3, 4, 3];
   private fixedDiceSeqIndex0 = 0;
   private static readonly KALI_NAME = "קלי";
 
   private waitingSyncTimer: Phaser.Time.TimerEvent | null = null;
   private lastRollClickTs: number | null = null;
+
+  // שלב סופי – שאלה אחרונה ב-30 צעדים
+  private finalQuestionActive = false;
+  private finalQuestionCompleted = false;
 
   constructor() {
     super("parallax-scene");
@@ -212,6 +218,12 @@ export default class ParallaxScene extends Phaser.Scene {
       targetHeight: this.playerTargetHeight,
     });
 
+    // שמות מתחת לכל שחקן
+    const initialNames = Array.from({ length: this.playerCount }, (_, i) =>
+      this.getPlayerDisplayName(i)
+    );
+    this.players.setPlayerNames(initialNames);
+
     this.camCtl.follow(this.players.getContainer(0));
 
     this.momCtl = new MomController(this);
@@ -232,7 +244,8 @@ export default class ParallaxScene extends Phaser.Scene {
     });
 
     this.noamTasks = new NoamTaskManager(this, {
-      steps: [27, 30],
+      // נועם רק ב-27 – ב-30 יש את השאלה הסופית / סיום המשחק
+      steps: [27],
       onTaskOpened: (_, type) => this.net?.sendTaskStarted?.(type),
       isBotPlayerIndex: (idx) => this.mode === "solo" && idx === 1,
       isLocalPlayerIndex: isLocalIdx,
@@ -322,6 +335,8 @@ export default class ParallaxScene extends Phaser.Scene {
         getStepSizePx: () => this.stepSizePx,
         getMyIndex: () => this.getMyIndex(),
         refreshHUD: () => this.refreshHUD(),
+        afterAllTasks: (playerIndex, stepsNow, done) =>
+          this.handleAfterAllTasks(playerIndex, stepsNow, done),
       }
     );
 
@@ -651,6 +666,343 @@ export default class ParallaxScene extends Phaser.Scene {
     });
   }
 
+  /** אחרי שכל המשימות (אמא, אבא, נועם) טופלו – בודקים אם צריך להציג את השאלה הסופית. */
+  private handleAfterAllTasks(
+    playerIndex: number,
+    stepsNow: number,
+    done: () => void
+  ) {
+    // אם כבר סיימנו את המשחק – לא עושים כלום
+    if (this.finalQuestionCompleted) {
+      done();
+      return;
+    }
+
+    // רק מי שהגיע ל־30 צעדים לפחות יכול לקבל את השאלה
+    if (stepsNow < 30) {
+      done();
+      return;
+    }
+
+    const me = this.getMyIndex();
+    // במסך הזה מציגים את השאלה רק לשחקן המקומי, בשאר המסכים התור פשוט ימשיך
+    if (me === null || me !== playerIndex) {
+      done();
+      return;
+    }
+
+    // אם כבר יש שאלה פעילה (לא אמור לקרות, אבל ליתר ביטחון)
+    if (this.finalQuestionActive) {
+      done();
+      return;
+    }
+
+    this.openFinalQuestion(playerIndex, stepsNow, done);
+  }
+
+  /** פותח חלון שאלה סופית לשחקן שהגיע ל־30. */
+  private openFinalQuestion(
+    playerIndex: number,
+    stepsNow: number,
+    done: () => void
+  ) {
+    this.finalQuestionActive = true;
+    this.lockForTask();
+
+    const depth = 26000;
+    const { width, height } = this.scale;
+
+    const root = this.add
+      .container(width / 2, height / 2)
+      .setDepth(depth)
+      .setScrollFactor(0);
+
+    const overlay = this.add
+      .rectangle(0, 0, width, height, 0x000000, 0.7)
+      .setOrigin(0.5);
+    overlay.disableInteractive();
+
+    const panelW = Math.min(760, Math.floor(width * 0.9));
+    const panelH = Math.min(420, Math.floor(height * 0.9));
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0xffffff, 1);
+    bg.lineStyle(4, 0x111111, 0.95);
+    bg.fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 26);
+    bg.strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 26);
+
+    const title = this.add
+      .text(
+        panelW / 2 - 30,
+        -panelH / 2 + 34,
+        "אנחנו כבר כמעט בחתונה!",
+        {
+          fontFamily: "Arial Black",
+          fontSize: "24px",
+          color: "#111",
+          align: "right",
+        }
+      )
+      .setOrigin(1, 0);
+
+    const line2 = this.add
+      .text(
+        panelW / 2 - 30,
+        -panelH / 2 + 70,
+        "בשביל לעבור את השלב האחרון ולהגיע לחתונה, עני על השאלה:",
+        {
+          fontFamily: "Arial",
+          fontSize: "18px",
+          color: "#333",
+          align: "right",
+          wordWrap: { width: panelW - 80, useAdvancedWrap: true },
+        }
+      )
+      .setOrigin(1, 0);
+
+    const question = this.add
+      .text(
+        panelW / 2 - 30,
+        -panelH / 2 + 122,
+        "מה השם חיבה שנועם קורא לקלי?",
+        {
+          fontFamily: "Arial Black",
+          fontSize: "20px",
+          color: "#111",
+          align: "right",
+          wordWrap: { width: panelW - 80, useAdvancedWrap: true },
+        }
+      )
+      .setOrigin(1, 0);
+
+    const timerText = this.add
+      .text(-panelW / 2 + 24, -panelH / 2 + 20, "⏳ 01:00", {
+        fontFamily: "Arial Black",
+        fontSize: "20px",
+        color: "#d90429",
+      })
+      .setOrigin(0, 0);
+
+    const device = this.sys.game.device;
+    const isMobile = device.os.android || device.os.iOS;
+    const viewport: any = (window as any).visualViewport || window;
+    const vw = viewport.width;
+    const vh = viewport.height;
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "כתבי כאן את שם החיבה...";
+    input.autocomplete = "off";
+    input.autocapitalize = "off";
+    input.spellcheck = false;
+    input.dir = "rtl";
+    input.style.position = "fixed";
+    input.style.left = `${vw / 2}px`;
+    const centerY = isMobile ? vh * 0.6 : vh * 0.6;
+    input.style.top = `${centerY}px`;
+    input.style.transform = "translate(-50%, -50%)";
+    input.style.width = `min(94vw, ${Math.min(720, vw - 48)}px)`;
+    input.style.height = "58px";
+    input.style.padding = "0 20px";
+    input.style.fontSize = "24px";
+    input.style.borderRadius = "14px";
+    input.style.border = "2px solid #111";
+    input.style.zIndex = "999999";
+    input.style.background = "#ffffff";
+    input.style.color = "#111111";
+
+    document.body.appendChild(input);
+
+    const cleanupHtmlInput = () => {
+      input.remove();
+    };
+
+    let remaining = 60;
+    const renderTimer = () => {
+      const mm = Math.floor(remaining / 60)
+        .toString()
+        .padStart(2, "0");
+      const ss = (remaining % 60).toString().padStart(2, "0");
+      timerText.setText(`⏳ ${mm}:${ss}`);
+    };
+    renderTimer();
+
+    const timerEvent = this.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => {
+        remaining -= 1;
+        renderTimer();
+        if (remaining <= 0) {
+          timerEvent.remove(false);
+          failAndClose("נגמר הזמן לשאלה...");
+        }
+      },
+    });
+
+    const normalize = (raw: string) =>
+      raw
+        .trim()
+        .replace(/["'״׳]/g, "")
+        .toLowerCase();
+
+    const correctAnswers = new Set([
+      "לרזוש",
+      "לרזושה",
+      "לרזושונת",
+    ]);
+
+    const finishAll = () => {
+      this.finalQuestionActive = false;
+      this.unlockAfterTask();
+      root.destroy(true);
+      cleanupHtmlInput();
+      done();
+    };
+
+    const winAndCelebrate = () => {
+      this.finalQuestionCompleted = true;
+      timerEvent.remove(false);
+      cleanupHtmlInput();
+      root.destroy(true);
+
+      this.startFinalCelebration(playerIndex);
+    };
+
+    const failAndClose = (message: string) => {
+      this.hudCtl.showSmallStatus(message);
+      timerEvent.remove(false);
+      finishAll();
+    };
+
+    input.addEventListener("keydown", (ev) => {
+      ev.stopPropagation();
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        const norm = normalize(input.value);
+        if (correctAnswers.has(norm)) {
+          winAndCelebrate();
+        } else {
+          failAndClose("התשובה לא נכונה... נסי שוב כשתגיעי שוב לסוף הדרך.");
+        }
+      }
+    });
+
+    window.setTimeout(() => {
+      input.focus();
+    }, 30);
+
+    root.add([overlay, bg, title, line2, question, timerText]);
+  }
+
+  /** אפקט סיום – קונפטי ו״חתולים״ מתעופפים באוויר, ואז חזרה לתפריט. */
+  private startFinalCelebration(playerIndex: number) {
+    this.lockForTask();
+    const winnerName = this.getPlayerDisplayName(playerIndex);
+
+    const { width, height } = this.scale;
+    const depth = 30000;
+
+    const root = this.add
+      .container(width / 2, height / 2)
+      .setDepth(depth)
+      .setScrollFactor(0);
+
+    const overlay = this.add
+      .rectangle(0, 0, width, height, 0x000000, 0.8)
+      .setOrigin(0.5);
+    overlay.disableInteractive();
+
+    const title = this.add
+      .text(0, -height * 0.18, "החתונה יצאה לדרך!", {
+        fontFamily: "Arial Black",
+        fontSize: "40px",
+        color: "#ffe066",
+        align: "center",
+      })
+      .setOrigin(0.5);
+
+    const winnerLine = this.add
+      .text(0, -height * 0.06, `${winnerName} – אלופה של החתונה!`, {
+        fontFamily: "Arial Black",
+        fontSize: "30px",
+        color: "#ffffff",
+        align: "center",
+      })
+      .setOrigin(0.5);
+
+    const sub = this.add
+      .text(
+        0,
+        height * 0.08,
+        "קונפטי, זיקוקים וחתולים מעופפים חוגגים את הניצחון שלך!",
+        {
+          fontFamily: "Arial",
+          fontSize: "20px",
+          color: "#ffeeff",
+          align: "center",
+          wordWrap: { width: width * 0.8, useAdvancedWrap: true },
+        }
+      )
+      .setOrigin(0.5);
+
+    root.add([overlay, title, winnerLine, sub]);
+
+    // "חתולים" מתעופפים (טקסט אמוג'י) מכל הכיוונים
+    const cats: Phaser.GameObjects.Text[] = [];
+    for (let i = 0; i < 40; i++) {
+      const x = Phaser.Math.Between(-width / 2, width / 2);
+      const y = Phaser.Math.Between(height / 2, height / 2 + 120);
+      const cat = this.add
+        .text(x, y, "😺", {
+          fontFamily: "Arial",
+          fontSize: "36px",
+        })
+        .setOrigin(0.5);
+      root.add(cat);
+      cats.push(cat);
+
+      this.tweens.add({
+        targets: cat,
+        y: y - Phaser.Math.Between(height * 0.6, height * 0.9),
+        x: x + Phaser.Math.Between(-120, 120),
+        angle: Phaser.Math.Between(-360, 360),
+        duration: Phaser.Math.Between(2500, 4200),
+        ease: "Sine.inOut",
+        repeat: -1,
+        yoyo: true,
+      });
+    }
+
+    // קונפטי צבעוני פשוט (מלבנים קטנים)
+    const confetti: Phaser.GameObjects.Rectangle[] = [];
+    for (let i = 0; i < 180; i++) {
+      const x = Phaser.Math.Between(-width / 2, width / 2);
+      const y = Phaser.Math.Between(-height / 2, height / 2);
+      const rect = this.add
+        .rectangle(x, y, 6, 14, Phaser.Display.Color.RandomRGB().color)
+        .setOrigin(0.5);
+      root.add(rect);
+      confetti.push(rect);
+
+      this.tweens.add({
+        targets: rect,
+        y: height / 2 + 80,
+        angle: Phaser.Math.Between(-360, 360),
+        duration: Phaser.Math.Between(2200, 3800),
+        ease: "Cubic.in",
+        repeat: -1,
+        delay: Phaser.Math.Between(0, 1200),
+      });
+    }
+
+    // אחרי כמה שניות – חזרה חגיגית לתפריט
+    this.time.delayedCall(9000, () => {
+      this.leavingToMenu = true;
+      this.scene.start("menu-scene");
+    });
+  }
+
   shutdown() {
     console.log("[CLIENT][ParallaxScene] shutdown", {
       ts: Date.now(),
@@ -709,6 +1061,11 @@ type MovementControllerOpts = {
   getStepSizePx: () => number;
   getMyIndex: () => number | null;
   refreshHUD: () => void;
+  afterAllTasks: (
+    playerIndex: number,
+    stepsNow: number,
+    done: () => void
+  ) => void;
 };
 
 class ParallaxMovementController {
@@ -749,16 +1106,20 @@ class ParallaxMovementController {
             stepsNow,
             () => {
               this.noamTasks.handleAfterMove(playerIndex, stepsNow, () => {
-                const followIdx = this.opts.getMyIndex() ?? 0;
+                const finalSteps = this.players.getSteps(playerIndex);
 
-                this.opts.refreshHUD();
+                this.opts.afterAllTasks(playerIndex, finalSteps, () => {
+                  const followIdx = this.opts.getMyIndex() ?? 0;
 
-                this.scene.time.delayedCall(100, () => {
-                  this.camCtl.follow(this.players.getContainer(followIdx));
+                  this.opts.refreshHUD();
+
+                  this.scene.time.delayedCall(100, () => {
+                    this.camCtl.follow(this.players.getContainer(followIdx));
+                  });
+
+                  this.ui.flushPendingDiceVisibility();
+                  onTurnFinished?.();
                 });
-
-                this.ui.flushPendingDiceVisibility();
-                onTurnFinished?.();
               });
             }
           );

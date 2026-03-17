@@ -170,8 +170,8 @@ export default class ParallaxOverlayController {
     const bg = this.scene.add.graphics();
     const bw = label.width + padX * 2;
     const bh = label.height + padY * 2;
-    // במובייל מקרבים את הבועה הרבה יותר קרוב לאמא (אפילו טיפה חופפת את הראש)
-    const gapAboveMom = this.opts.isMobileDevice() ? -6 : 18;
+    // במובייל הבועה ממש צמודה לראש של אמא (הזנב כמעט נוגע בה)
+    const gapAboveMom = this.opts.isMobileDevice() ? -bh / 2 : 18;
     const tailH = 20;
     const tailW = 14;
 
