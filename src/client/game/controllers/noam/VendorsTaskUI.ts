@@ -194,6 +194,15 @@ export default class VendorsTaskUI {
   private createMobileInput(needCount: number) {
     this.destroyHtmlInput();
 
+    const device = this.scene.sys.game.device;
+    const isMobile = device.os.android || device.os.iOS;
+
+    // בדסקטופ לא יוצרים אינפוט HTML – משתמשים בשדה הטקסט בתוך הפאנל של פייזר,
+    // כדי שלא יהיו בעיות במסך מלא.
+    if (!isMobile) {
+      return;
+    }
+
     const input = document.createElement("input");
     input.type = "text";
     input.placeholder = "כתבי ספק...";
@@ -202,15 +211,18 @@ export default class VendorsTaskUI {
     input.spellcheck = false;
     input.dir = "rtl";
 
-    const w = this.scene.scale.width;
-    const h = this.scene.scale.height;
-    // במובייל: תיבת הטקסט במרכז המסך וגבוהה enough כדי שיהיה נראה (מעל המקלדת)
-    const inputCenterY = Math.round(h * 0.38);
+    const viewport = (window as any).visualViewport || window;
+    const vw = viewport.width;
+    const vh = viewport.height;
+
+    // במובייל: תיבת הטקסט קצת מעל האמצע כדי שתהיה מעל המקלדת.
+    // בדסקטופ: נמוך אבל לא קרוב מידי לתחתית (בערך 54% מהגובה) כדי שיראה גם במסך מלא.
+    const inputCenterY = isMobile ? Math.round(vh * 0.38) : Math.round(vh * 0.54);
     input.style.position = "fixed";
-    input.style.left = `${w / 2}px`;
+    input.style.left = `${vw / 2}px`;
     input.style.top = `${inputCenterY}px`;
     input.style.transform = "translate(-50%, -50%)";
-    input.style.width = `min(94vw, ${Math.min(720, w - 48)}px)`;
+    input.style.width = `min(94vw, ${Math.min(720, vw - 48)}px)`;
     input.style.height = "56px";
     input.style.padding = "0 20px";
     input.style.fontSize = "22px";
