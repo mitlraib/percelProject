@@ -743,12 +743,13 @@ export default class ParallaxScene extends Phaser.Scene {
       .text(
         panelW / 2 - 30,
         -panelH / 2 + 34,
-        "אנחנו כבר כמעט בחתונה!",
+        "אנחנו כבר כמעט בחתונה\u200F!",
         {
           fontFamily: "Arial Black",
           fontSize: "24px",
           color: "#111",
           align: "right",
+          rtl: true,
         }
       )
       .setOrigin(1, 0);
@@ -757,12 +758,13 @@ export default class ParallaxScene extends Phaser.Scene {
       .text(
         panelW / 2 - 30,
         -panelH / 2 + 70,
-        "בשביל לעבור את השלב האחרון ולהגיע לחתונה, עני על השאלה:",
+        "בשביל לעבור את השלב האחרון ולהגיע לחתונה, עני על השאלה\u200F:",
         {
           fontFamily: "Arial",
           fontSize: "18px",
           color: "#333",
           align: "right",
+          rtl: true,
           wordWrap: { width: panelW - 80, useAdvancedWrap: true },
         }
       )
@@ -772,12 +774,13 @@ export default class ParallaxScene extends Phaser.Scene {
       .text(
         panelW / 2 - 30,
         -panelH / 2 + 122,
-        "מה השם חיבה שנועם קורא לקלי?",
+        "מה השם חיבה שנועם קורא לקלי\u200F?",
         {
           fontFamily: "Arial Black",
           fontSize: "20px",
           color: "#111",
           align: "right",
+          rtl: true,
           wordWrap: { width: panelW - 80, useAdvancedWrap: true },
         }
       )
@@ -819,7 +822,10 @@ export default class ParallaxScene extends Phaser.Scene {
     input.style.background = "#ffffff";
     input.style.color = "#111111";
 
-    document.body.appendChild(input);
+    // במסך מלא רק ילדים של fullscreenElement מוצגים, לכן מוסיפים לשם אם יש.
+    const fullscreenHost = document.fullscreenElement as HTMLElement | null;
+    const host = fullscreenHost ?? document.body;
+    host.appendChild(input);
 
     const cleanupHtmlInput = () => {
       input.remove();

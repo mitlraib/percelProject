@@ -14,6 +14,8 @@ export default class VendorsTaskUI {
   private timerText?: Phaser.GameObjects.Text;
   private inputText?: Phaser.GameObjects.Text;
   private listText?: Phaser.GameObjects.Text;
+  private feedbackText?: Phaser.GameObjects.Text;
+  private feedbackTimer?: Phaser.Time.TimerEvent;
 
   private remaining = 60;
   private timerEvent?: Phaser.Time.TimerEvent;
@@ -185,6 +187,9 @@ export default class VendorsTaskUI {
     this.timerText = undefined;
     this.inputText = undefined;
     this.listText = undefined;
+    this.feedbackText = undefined;
+    this.feedbackTimer?.remove(false);
+    this.feedbackTimer = undefined;
 
     this.resolve = undefined;
     this.scene.input.topOnly = false;
@@ -196,12 +201,6 @@ export default class VendorsTaskUI {
 
     const device = this.scene.sys.game.device;
     const isMobile = device.os.android || device.os.iOS;
-
-    // בדסקטופ לא יוצרים אינפוט HTML – משתמשים בשדה הטקסט בתוך הפאנל של פייזר,
-    // כדי שלא יהיו בעיות במסך מלא.
-    if (!isMobile) {
-      return;
-    }
 
     const input = document.createElement("input");
     input.type = "text";
@@ -216,8 +215,8 @@ export default class VendorsTaskUI {
     const vh = viewport.height;
 
     // במובייל: תיבת הטקסט קצת מעל האמצע כדי שתהיה מעל המקלדת.
-    // בדסקטופ: נמוך אבל לא קרוב מידי לתחתית (בערך 54% מהגובה) כדי שיראה גם במסך מלא.
-    const inputCenterY = isMobile ? Math.round(vh * 0.38) : Math.round(vh * 0.54);
+    // בדסקטופ: נמוך אבל מעט יותר גבוה (52%) כדי שלא יסתיר את הרשימה.
+    const inputCenterY = isMobile ? Math.round(vh * 0.36) : Math.round(vh * 0.52);
     input.style.position = "fixed";
     input.style.left = `${vw / 2}px`;
     input.style.top = `${inputCenterY}px`;
@@ -232,7 +231,10 @@ export default class VendorsTaskUI {
     input.style.background = "#ffffff";
     input.style.color = "#111111";
 
-    document.body.appendChild(input);
+    // במסך מלא רק ילדים של fullscreenElement מוצגים, לכן מוסיפים לשם אם קיים.
+    const fullscreenHost = document.fullscreenElement as HTMLElement | null;
+    const host = fullscreenHost ?? document.body;
+    host.appendChild(input);
     this.htmlInput = input;
 
     input.addEventListener("input", () => {
@@ -282,9 +284,13 @@ export default class VendorsTaskUI {
       .map((s) => s.trim())
       .filter(Boolean);
 
+    let hasInvalid = false;
     for (const p of parts) {
       const canon = this.canon.toCanonical(p);
-      if (!canon) continue;
+      if (!canon) {
+        hasInvalid = true;
+        continue;
+      }
 
       this.found.add(canon);
 
@@ -295,6 +301,9 @@ export default class VendorsTaskUI {
     }
 
     this.renderList(needCount);
+    if (hasInvalid) {
+      this.showFeedback("זה לא ברשימה שלי");
+    }
   }
 
   private finish(result: VendorsTaskUIResult) {
@@ -338,5 +347,25 @@ export default class VendorsTaskUI {
     if (titleObj && "setText" in titleObj) {
       titleObj.setText(`נכנסו (${this.found.size}/${needCount}):`);
     }
+  }
+
+  private showFeedback(message: string) {
+    if (!this.feedbackText) {
+      this.feedbackText = this.scene.add
+        .text(0, 146, "", {
+          fontFamily: "Arial Black",
+          fontSize: "18px",
+          color: "#b00020",
+          align: "center",
+        })
+        .setOrigin(0.5, 0);
+      this.uiRoot?.add(this.feedbackText);
+    }
+
+    this.feedbackText.setText(message);
+    this.feedbackTimer?.remove(false);
+    this.feedbackTimer = this.scene.time.delayedCall(1200, () => {
+      this.feedbackText?.setText("");
+    });
   }
 }

@@ -103,13 +103,18 @@ export default class WeddingSeatingGuestsController {
         .setDepth(this.opts.depth)
         .setSize(cardW, cardH);
 
+      // אזור גרירה מעט גדול יותר מהכרטיס כדי שהגרירה תהיה קלה מכל נקודה
+      const dragHitW = cardW + (mobile ? 26 : 20);
+      const dragHitH = cardH + (mobile ? 16 : 12);
+
       const dragZone = this.scene.add
-        .zone(x, y, cardW, cardH)
+        .zone(x, y, dragHitW, dragHitH)
         .setScrollFactor(0)
         .setDepth(this.opts.depth + 1)
-        .setSize(cardW, cardH)
+        .setSize(dragHitW, dragHitH)
+        .setOrigin(0.5)
         .setInteractive(
-          new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH),
+          new Phaser.Geom.Rectangle(0, 0, dragHitW, dragHitH),
           Phaser.Geom.Rectangle.Contains
         );
 
