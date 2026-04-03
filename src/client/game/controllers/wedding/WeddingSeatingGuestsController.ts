@@ -97,27 +97,25 @@ export default class WeddingSeatingGuestsController {
         })
         .setOrigin(0.5);
 
+      // padding מספיק גדול בצדדים (במיוחד ימין ב־RTL) כדי שכל הכרטיס ייתפס בגרירה
+      const hitPadX = mobile ? 18 : 14;
+      const hitPadY = mobile ? 10 : 8;
+      const hitW = cardW + hitPadX * 2;
+      const hitH = cardH + hitPadY * 2;
+
       const container = this.scene.add
         .container(x, y, [bg, label])
         .setScrollFactor(0)
         .setDepth(this.opts.depth)
         .setSize(cardW, cardH);
 
-      // אזור גרירה מעט גדול יותר מהכרטיס כדי שהגרירה תהיה קלה מכל נקודה
-      const dragHitW = cardW + (mobile ? 26 : 20);
-      const dragHitH = cardH + (mobile ? 16 : 12);
-
       const dragZone = this.scene.add
-        .zone(x, y, dragHitW, dragHitH)
+        .zone(x, y, hitW, hitH)
         .setScrollFactor(0)
         .setDepth(this.opts.depth + 1)
-        .setSize(dragHitW, dragHitH)
+        .setSize(hitW, hitH)
         .setOrigin(0.5)
-        .setInteractive(
-          new Phaser.Geom.Rectangle(0, 0, dragHitW, dragHitH),
-          Phaser.Geom.Rectangle.Contains
-        );
-
+        .setInteractive();
       this.scene.input.setDraggable(dragZone);
 
       this.opts.root.add(container);
@@ -144,33 +142,34 @@ export default class WeddingSeatingGuestsController {
   }
 
   private setupGuestDrag(card: GuestCardWithDragZone) {
-    const dragTarget = card.dragZone;
+    const c = card.container;
+    const z = card.dragZone;
     const mobile = this.isMobile();
 
-    dragTarget.on("dragstart", () => {
+    z.on("dragstart", () => {
       if (this.opts.finished()) return;
 
-      card.container.setScale(mobile ? 1.06 : 1.08);
-      card.container.setDepth(999999);
-      card.dragZone.setDepth(1000000);
+      c.setScale(mobile ? 1.06 : 1.08);
+      c.setDepth(this.opts.depth + 5000);
+      z.setDepth(this.opts.depth + 5001);
       this.highlightAllSeats(true);
     });
 
-    dragTarget.on("drag", (_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
+    z.on("drag", (_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
       if (this.opts.finished()) return;
 
-      card.dragZone.x = dragX;
-      card.dragZone.y = dragY;
-      card.container.x = dragX;
-      card.container.y = dragY;
+      z.x = dragX;
+      z.y = dragY;
+      c.x = dragX;
+      c.y = dragY;
     });
 
-    dragTarget.on("dragend", () => {
+    z.on("dragend", () => {
       if (this.opts.finished()) return;
 
-      card.container.setScale(1);
-      card.container.setDepth(this.opts.depth);
-      card.dragZone.setDepth(this.opts.depth + 1);
+      c.setScale(1);
+      c.setDepth(this.opts.depth);
+      z.setDepth(this.opts.depth + 1);
       this.highlightAllSeats(false);
 
       const seat = this.findSeatUnderCard(card);
